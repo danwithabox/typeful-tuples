@@ -1,7 +1,7 @@
-import { uniqueTuple } from "../src/index.js";
 import { test } from "vitest";
+import { uniqueTuple } from "../src/index.js";
 
-test(`public example`, () => {
+test("public example", () => {
     const values1_correct1 = uniqueTuple([1, 2, 3, 4]);
     // @ts-expect-error invalid
     const values1_invalid1 = uniqueTuple([1, 2, 3, 2]);

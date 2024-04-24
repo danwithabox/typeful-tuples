@@ -7,6 +7,10 @@ TODO:
 - mention that tupleOf could probably be deprecated with partial generics
     - and make an open issue about it
     - and reference the upstream TS issue: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
+- type-only examples and tests
+- decide if TS peer dependency is needed
+    - check type-fest for guideline
+    - list which versions of TS it works with, maybe run tests for other versions somehow?
 
 TODO: seed on all found search results
 - https://www.reddit.com/r/typescript/comments/182fkh1/how_do_i_ensure_array_members_are_unique/

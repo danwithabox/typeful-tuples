@@ -1,5 +1,5 @@
-import { tuple, uniqueTuple } from "../src/index.js";
 import { expectTypeOf, test } from "vitest";
+import { uniqueTuple } from "../src/index.js";
 
 test(`uniqueTuple() returns the input unchanged, number[]`, () => {
     const input = [1];
@@ -33,6 +33,14 @@ test(`unique, indirect const argument, is accepted`, () => {
     expectTypeOf(input).toEqualTypeOf<readonly [1, 2, 3]>();
 
     uniqueTuple(input);
+});
+
+test(`direct argument, non-unique, minimal amount of items, last item is not accepted`, () => {
+    uniqueTuple([
+        1,
+        // @ts-expect-error middle item of input is deliberately not unique
+        1,
+    ]);
 });
 
 test(`direct argument, non-unique, middle item is not accepted`, () => {
@@ -89,10 +97,11 @@ test(`direct argument, non-unique, multiple composite types`, () => {
         ["a"],
         // @ts-expect-error not unique
         ["a"],
-        { a: true, },
+        { a: [true, false], },
         { b: true, },
+        { a: [false, true], },
         // @ts-expect-error not unique
-        { a: true, },
+        { a: [true, false], },
     ]);
 });
 

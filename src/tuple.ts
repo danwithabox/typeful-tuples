@@ -7,10 +7,3 @@ export function tupleOf<const V>() {
 
 }
 
-function sandbox() {
-    type Allowed = 1 | 2 | 3;
-    const output = tuple([1, 2, 3, 4] as const satisfies Allowed[]);
-
-    const out1 = tupleOf<Allowed>()([2, 1, 4]);
-    const out2 = tupleOf<Allowed>()([2, 1, 3]);
-}
