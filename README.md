@@ -14,3 +14,13 @@ TODO:
 
 TODO: seed on all found search results
 - https://www.reddit.com/r/typescript/comments/182fkh1/how_do_i_ensure_array_members_are_unique/
+
+TODO: testing multiple versions
+- identify not working TS version and working TS version
+- for now, use the working TS version
+- npm workspaces!
+- one workspace for source and test files
+- another workspace as a "vitest runner", try including test files from other workspace
+- https://vitest.dev/guide/workspace
+- if vitest workspace can run the other workspace's source, make another vitest runner workspace
+- use not working TS version in that runner workspace
