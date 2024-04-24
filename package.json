@@ -1,0 +1,47 @@
+{
+    "name": "@danwithabox/rename-me",
+    "version": "0.1.0",
+    "description": "rename-me",
+    "type": "module",
+    "engines": {
+        "node": "^18.18.0 || >=20.0.0"
+    },
+    "keywords": [
+        "rename-me"
+    ],
+    "main": "./lib/index.cjs",
+    "module": "./lib/index.js",
+    "types": "./lib/index.d.ts",
+    "exports": {
+        ".": {
+            "require": {
+                "types": "./lib/index.d.cts",
+                "default": "./lib/index.cjs"
+            },
+            "import": {
+                "types": "./lib/index.d.ts",
+                "default": "./lib/index.js"
+            }
+        }
+    },
+    "files": [
+        "lib"
+    ],
+    "author": "danwithabox <danwithabox@gmail.com> (https://github.com/danwithabox)",
+    "license": "MIT",
+    "scripts": {
+        "build": "tsup && publint",
+        "prepack": "npm run build",
+        "prepublishOnly": "npm run build",
+        "type-check": "tsc --noEmit",
+        "test": "vitest --typecheck"
+    },
+    "devDependencies": {
+        "@danwithabox/eslint-entree-typescript": "^0.1.13",
+        "@types/node": "^20.11.19",
+        "publint": "^0.2.7",
+        "tsup": "^8.0.2",
+        "typescript": "^5.3.3",
+        "vitest": "^1.5.0"
+    }
+}
