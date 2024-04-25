@@ -1,0 +1,13 @@
+{
+    "name": "vitest-ts-5.4.5",
+    "version": "1.0.0",
+    "private": true,
+    "devDependencies": {
+        "typescript": "5.4.5",
+        "vitest": "^1.5.2"
+    },
+    "scripts": {
+        "test": "vitest --typecheck"
+    },
+    "license": "MIT"
+}
