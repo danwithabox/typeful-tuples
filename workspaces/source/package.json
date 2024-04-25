@@ -1,13 +1,13 @@
 {
-    "name": "@danwithabox/rename-me",
+    "name": "@danwithabox/unique-tuple-ts",
     "version": "0.1.0",
-    "description": "rename-me",
+    "description": "unique-tuple-ts",
     "type": "module",
     "engines": {
         "node": "^18.18.0 || >=20.0.0"
     },
     "keywords": [
-        "rename-me"
+        "unique-tuple-ts"
     ],
     "main": "./lib/index.cjs",
     "module": "./lib/index.js",
@@ -43,8 +43,5 @@
         "tsup": "^8.0.2",
         "typescript": "5.4.5",
         "vitest": "^1.5.0"
-    },
-    "workspaces": [
-        "workspaces/source"
-    ]
+    }
 }

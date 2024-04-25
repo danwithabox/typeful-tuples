@@ -1,9 +1,12 @@
 {
 	"folders": [
-		{
-			"path": "."
-		}
-	],
+        {
+            "path": "."
+        },
+        {
+            "path": "workspaces/source"
+        }
+    ],
 	"settings": {
 		"typescript.tsdk": "node_modules\\typescript\\lib"
 	}
