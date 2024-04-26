@@ -3,12 +3,13 @@
     "version": "1.0.0",
     "type": "module",
     "private": true,
+    "scripts": {
+        "test": "vitest --typecheck",
+        "test-once": "vitest run --typecheck"
+    },
     "devDependencies": {
         "typescript": "5.4.5",
-        "vitest": "^1.5.2"
-    },
-    "scripts": {
-        "test": "vitest --typecheck"
+        "vitest": "1.5.2"
     },
     "license": "MIT"
 }

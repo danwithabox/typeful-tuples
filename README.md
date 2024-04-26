@@ -24,3 +24,6 @@ TODO: testing multiple versions
 - https://vitest.dev/guide/workspace
 - if vitest workspace can run the other workspace's source, make another vitest runner workspace
 - use not working TS version in that runner workspace
+
+FINDING:
+- workspace file does NOT replace TS
