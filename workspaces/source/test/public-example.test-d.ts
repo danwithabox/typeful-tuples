@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { expectTypeOf, test } from "vitest";
 import { uniqueTuple } from "../src/index.js";
 
 test("public example", () => {

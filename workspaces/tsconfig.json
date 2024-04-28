@@ -2,7 +2,6 @@
     "compilerOptions": {
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
-        "resolveJsonModule": true,
         "verbatimModuleSyntax": true,
         "strict": true,
         "types": [

@@ -7,10 +7,13 @@
             "path": "workspaces/source"
         },
         {
+            "path": "workspaces/vitest-ts-latest"
+        },
+        {
             "path": "workspaces/vitest-ts-5.4.5"
         }
     ],
 	"settings": {
-		"typescript.tsdk": "node_modules\\typescript\\lib"
+		"typescript.tsdk": "unique-tuple-ts\\node_modules\\typescript\\lib"
 	}
 }

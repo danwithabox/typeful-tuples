@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from "vitest/config";
-import { vitestConfigBase_forSpecificTsVersionWorkspace } from "../../vitest-shared.js";
+import { vitestConfigBase_forSpecificTsVersionWorkspace } from "../vitest-workspaces-shared.js";
 
 export default mergeConfig(
     vitestConfigBase_forSpecificTsVersionWorkspace(`ignore_version`),
@@ -8,5 +8,3 @@ export default mergeConfig(
         },
     }),
 );
-
-

@@ -32,10 +32,7 @@
     "scripts": {
         "build": "tsup && publint",
         "prepack": "npm run build",
-        "prepublishOnly": "npm run build",
-        "type-check": "tsc --noEmit",
-        "test": "vitest --typecheck",
-        "test-once": "vitest run --typecheck"
+        "prepublishOnly": "npm run build"
     },
     "devDependencies": {
         "@danwithabox/eslint-entree-typescript": "^0.1.13",
