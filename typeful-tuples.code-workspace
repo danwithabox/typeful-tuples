@@ -14,6 +14,6 @@
         }
     ],
 	"settings": {
-		"typescript.tsdk": "unique-tuple-ts\\node_modules\\typescript\\lib"
+		"typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib"
 	}
 }

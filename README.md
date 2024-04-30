@@ -1,3 +1,8 @@
+README:
+- list all utils
+- show with gifs the DX of using each util
+- a word about reliability - covered by tests for various TS versions, no heavy type-system abuse
+
 TODO:
 - real life example
 - disclaimer that this is for TS only, just a type-level thing, so it's lightweight
@@ -20,5 +25,6 @@ TODO: testing multiple versions
 - handlebars codegen
 - run latest, 5.4.5, and 5.3.3 in sequence
 
-FINDING:
-- workspace file does NOT replace TS
+TODO:
+- tested TS versions as peer dependency? check how type-fest and typebox does it
+    - maybe don't, because it has no runtime effect? so failing an isntall on this would be unnecessary?

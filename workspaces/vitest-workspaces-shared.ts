@@ -2,11 +2,12 @@ import type { Plugin, UserConfig } from "vite";
 import chalk from "chalk";
 
 export type ExpectedTsVersionString = `${number}.${number}.${number}` | `ignore_version`;
+/** Use with `mergeConfig`, otherwise test.excludes*/
 export function vitestConfigBase_forSpecificTsVersionWorkspace(expectedVersion: ExpectedTsVersionString): UserConfig {
     return {
         plugins: [plugin_typescriptVersionAssert(expectedVersion)],
         test:    {
-            root: `../source`,
+            root: `../source`, // This is relative to the specific `vitest.config.ts` file this is used in
         },
     };
 }

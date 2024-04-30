@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { uniqueTuple } from "../src/index.js";
+import { tupleUnique } from "../src/index.js";
 
 // /** Idk what to do about this, there is no `NaN` type it's just `number` so it screws things up */
 // const values_NOPE1 = uniqueTuple([0, NaN,                   3, 4, 1, 2]);
@@ -13,7 +13,7 @@ import { uniqueTuple } from "../src/index.js";
 
 test(`uniqueTuple() returns the input unchanged`, () => {
     const input = [1, 2, 3];
-    const output = uniqueTuple(input);
+    const output = tupleUnique(input);
 
     expect(output).toEqual(input);
 });

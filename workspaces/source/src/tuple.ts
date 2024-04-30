@@ -4,6 +4,4 @@ export function tuple<const V, T extends readonly V[]>(values: InferConstTuple<T
 
 export function tupleOf<const V>() {
     return function <T extends readonly V[]>(values: InferConstTuple<T>) { return values; };
-
 }
-

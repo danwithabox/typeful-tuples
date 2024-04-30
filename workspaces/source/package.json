@@ -1,13 +1,13 @@
 {
-    "name": "@danwithabox/unique-tuple-ts",
+    "name": "@danwithabox/typeful-tuples",
     "version": "0.1.0",
-    "description": "unique-tuple-ts",
+    "description": "typeful-tuples",
     "type": "module",
     "engines": {
         "node": "^18.18.0 || >=20.0.0"
     },
     "keywords": [
-        "unique-tuple-ts"
+        "typeful-tuples"
     ],
     "main": "./lib/index.cjs",
     "module": "./lib/index.js",
