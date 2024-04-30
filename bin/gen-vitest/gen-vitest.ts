@@ -3,6 +3,8 @@
 import pkg from "../../package.json";
 import { dirname, filename, join } from "desm";
 import fs from "fs-extra";
+import Handlebars from "handlebars";
+import { globSync } from "glob";
 import { program } from "@commander-js/extra-typings";
 import { execa } from "execa";
 import ora from "ora";
@@ -13,14 +15,37 @@ const __dirname = dirname(import.meta.url);
 const __filename = filename(import.meta.url);
 const __join = (...str: string[]) => join(import.meta.url, ...str);
 
-const PATH_TEMP = `./gen-vitest-tmp`;
-const PATH_PACKAGE_JSON = `./package.json`;
+const PATH_DIR_TEMP = `./gen-vitest-temp/` as const;
+const PATH_DIR_ROOT = `../../` as const;
+const PATH_FILE_PACKAGE_JSON = `package.json` as const;
+const PATH_FILE_CODE_WORKSPACE = `typeful-tuples.code-workspace` as const;
+const PATH_DIR_WORKSPACE = `workspaces/` as const;
+const PATH_DIR_WORKSPACE_VITEST_TS_VERSION = (version: string) => `${PATH_DIR_WORKSPACE}vitest-ts-${version}/` as const;
+const PATH_FILE_WORKSPACE_PACKAGE_JSON = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}package.json` as const;
+const PATH_FILE_WORKSPACE_VITEST_CONFIG_TS = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}vitest.config.ts` as const;
+
+/** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
 function safeRmdir() {
+    /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
+    const globAtTempDirToAbsolute = (pattern: string | string[]) => globSync(pattern, { cwd: __join(PATH_DIR_TEMP), })
+        .map((globPath) => __join(PATH_DIR_TEMP, globPath))
+    ;
     try {
-        fs.rmSync(__join(PATH_TEMP, PATH_PACKAGE_JSON));
-        fs.rmdirSync(__join(PATH_TEMP));
+        const globs = [
+            PATH_FILE_PACKAGE_JSON,
+            PATH_FILE_CODE_WORKSPACE,
+            PATH_DIR_WORKSPACE,
+            PATH_DIR_WORKSPACE_VITEST_TS_VERSION("*"),
+            PATH_FILE_WORKSPACE_PACKAGE_JSON("*"),
+            PATH_FILE_WORKSPACE_VITEST_CONFIG_TS("*"),
+        ];
+        const pathsToRemove = globAtTempDirToAbsolute(globs).sort((a, b) => b.length - a.length);
+
+        for (const path of pathsToRemove) fs.statSync(path).isDirectory() ? fs.rmdirSync(path) : fs.rmSync(path);
+
+        fs.rmdirSync(__join(PATH_DIR_TEMP));
     } catch (error) {
-        console.error(error);
+        throw error;
     }
 }
 
@@ -30,14 +55,14 @@ await async function main() {
         .description(`Generates a workspace to run Vitest with the given pinned version of typescript.`)
         .showHelpAfterError()
         .requiredOption(`-ts, --ts-version <value>`, `The pinned typescript version to use with the Vitest workspace.`)
-        .option(`--keep-temp`, `Keep the "${PATH_TEMP}" folder (on error AND success). Default: false.`)
+        .option(`--keep-temp`, `Keep the "${PATH_DIR_TEMP}" folder (on error AND success). Default: false.`)
         .parse()
         .opts()
     ;
 
     const { tsVersion, keepTemp = false, } = params;
 
-    const spinner = ora(`Creating files`);
+    const spinner = ora();
 
     async function asyncOperation<R>(
         text: string,
@@ -76,34 +101,118 @@ await async function main() {
 
         await asyncOperation(`Creating temp folder to aid transactional file changes`, async ({ succeed, fail, }) => {
             try {
-                await fs.mkdir(join(import.meta.url, PATH_TEMP));
-                succeed(`Temp folder "${PATH_TEMP}" created`);
+                safeRmdir();
+                await fs.mkdir(join(import.meta.url, PATH_DIR_TEMP));
+                succeed(`Temp folder "${PATH_DIR_TEMP}" created`);
             } catch (error) {
                 const msg = error instanceof Error ? error.message : error;
-                fail(`Creating temp folder to aid transactional file changes: couldn't create folder "${PATH_TEMP}": ${msg}`);
+                fail(`Creating temp folder to aid transactional file changes: couldn't create folder "${PATH_DIR_TEMP}": ${msg}`);
             }
         });
 
-        await asyncOperation(`Updating "package.json" with new workspace folder entry`, async ({ succeed, fail, }) => {
-            type pkg = typeof pkg;
+        const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
 
-            const _workspace = `workspaces/vitest-ts-${tsVersion}`;
+        await asyncOperation(`Updating "package.json" with new workspace folder entry`, async ({ succeed, fail, }) => {
+            const _workspace = `workspaces/vitest-ts-${tsVersion}` as const;
             const isWorkspaceAlreadyPresent = pkg.workspaces.includes(_workspace);
             if (isWorkspaceAlreadyPresent) fail(`Updating "package.json" with new workspace folder entry: workspace already exists`);
 
-            const workspaces = [_workspace, ...pkg.workspaces];
+            const workspaces = [_workspace, ...pkg.workspaces].sort();
             const _pkg = { ...pkg, workspaces, };
-            spinner.info(JSON.stringify(_pkg, null, 4));
-            return _pkg;
+
+            try {
+                const path_temp_package_json = __join(PATH_DIR_TEMP, PATH_FILE_PACKAGE_JSON);
+                await fs.writeFile(path_temp_package_json, JSON.stringify(_pkg, null, indent_size));
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail(`Updating "package.json" with new workspace folder entry: ${message}`);
+            }
+
+            succeed(`Updating "package.json" with new workspace folder entry`);
         });
+
+        await asyncOperation(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry`, async ({ succeed, fail, }) => {
+            type File_CodeWorkspace = {
+                "folders":  Array<{
+                    "path": string,
+                }>,
+                "settings": {
+                    "typescript.tsdk": string,
+                },
+            };
+
+            const path_root_code_workspace = __join(PATH_DIR_ROOT, PATH_FILE_CODE_WORKSPACE);
+            const file_code_workspace: File_CodeWorkspace = JSON.parse(await fs.readFile(path_root_code_workspace, "utf-8"));
+
+            const _workspace = `workspaces/vitest-ts-${tsVersion}` as const;
+            const isWorkspaceAlreadyPresent = file_code_workspace.folders.some(({ path, }) => path === _workspace);
+            if (isWorkspaceAlreadyPresent) fail(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry: workspace already exists`);
+
+            file_code_workspace.folders.push({ path: _workspace, });
+            file_code_workspace.folders.sort((a, b) => a.path < b.path ? -1 : 1);
+
+            try {
+                const path_temp_code_workspace = __join(PATH_DIR_TEMP, PATH_FILE_CODE_WORKSPACE);
+                await fs.writeFile(path_temp_code_workspace, JSON.stringify(file_code_workspace, null, indent_size));
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry: ${message}`);
+            }
+
+            succeed(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry`);
+        });
+
+        const path_workspace_package_json = PATH_FILE_WORKSPACE_PACKAGE_JSON(tsVersion);
+        await asyncOperation(`Generating "${path_workspace_package_json}"`, async ({ succeed, fail, }) => {
+            const template = Handlebars.compile(fs.readFileSync(__join("./workspace__package_json.hbs"), "utf-8"));
+            const rendered = template({
+                json_name:                       "TODO",
+                json_devDependencies_typescript: "TODO 2",
+                json_devDependencies_vitest:     "TODO 3",
+            });
+
+            try {
+                const path_temp_workspace_package_json = __join(PATH_DIR_TEMP, path_workspace_package_json);
+                await fs.outputFile(path_temp_workspace_package_json, rendered);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail(`Generating "${path_workspace_package_json}": ${message}`);
+            }
+
+            succeed(`Generating "${path_workspace_package_json}"`);
+        });
+
+        const path_workspace_vitest_config_ts = PATH_FILE_WORKSPACE_VITEST_CONFIG_TS(tsVersion);
+        await asyncOperation(`Generating "${path_workspace_vitest_config_ts}"`, async ({ succeed, fail, }) => {
+            const rendered = `TODO`;
+
+            try {
+                const path_temp_workspace_vitest_config_ts = __join(PATH_DIR_TEMP, path_workspace_vitest_config_ts);
+                await fs.outputFile(path_temp_workspace_vitest_config_ts, rendered);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail(`Generating "${path_workspace_vitest_config_ts}": ${message}`);
+            }
+
+            succeed(`Generating "${path_workspace_vitest_config_ts}"`);
+        });
+
+        console.info();
+        spinner.succeed(`Generation done!`);
     } catch (error) {
         console.info();
         spinner.warn(`Generating failed`);
+        console.error(error);
     } finally {
-        if (keepTemp) spinner.info(`Option "--keep-temp": temp folder "${PATH_TEMP}" will be kept.`);
+        console.info();
+        if (keepTemp) spinner.info(`Option "--keep-temp": temp folder "${PATH_DIR_TEMP}" will be kept.`);
         else {
-            spinner.info(`Removing temp folder "${PATH_TEMP}". Pass "--keep-temp" to keep it.`);
-            safeRmdir();
+            spinner.info(`Removing temp folder "${PATH_DIR_TEMP}". Pass "--keep-temp" to keep it.`);
+            try {
+                safeRmdir();
+            } catch (error) {
+                console.error(error);
+            }
         }
         process.exit(1);
     }
@@ -113,20 +222,7 @@ await async function main() {
 
 async function waitFor(ms?: number) { return new Promise<void>((resolve) => { setTimeout(() => resolve(), ms); }); }
 
-function updateFiles() {
-    function root_file__package_json() {
-        type PackageJson = typeof pkg;
-    }
-    function root_file__code_workspace() {
-        const filePath = `typeful-tuples.code-workspace`;
-        type CodeWorkspace = {
-            "folders":  Array<{ "path": string, }>,
-            "settings": {
-                "typescript.tsdk": string,
-            },
-        };
-    }
-}
+
 function generateFiles() {
     const context_typescriptVersion = `5.4.5`;
 
