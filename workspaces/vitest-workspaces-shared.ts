@@ -1,8 +1,8 @@
 import type { Plugin, UserConfig } from "vite";
 import chalk from "chalk";
+import type { LiteralUnion } from "type-fest";
 
-export type SemverString = `${number}.${number}.${number}`;
-export type ExpectedTsVersionString = SemverString | `ignore_version`;
+export type ExpectedTsVersionString = LiteralUnion<`ignore_version`, string>;
 /** Use with `mergeConfig`, otherwise test.excludes*/
 export function vitestConfigBase_forSpecificTsVersionWorkspace(
     expectedVersion: ExpectedTsVersionString,
