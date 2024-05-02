@@ -246,6 +246,7 @@ await async function main() {
 
         console.info();
         spinner.succeed(`Generation done!`);
+        spinner.info(`Run "npm run test" from the project root to run the tests in all workspaces, including the newly generated one!`);
     } catch (error) {
         console.info();
         spinner.warn(`Generating failed`);
