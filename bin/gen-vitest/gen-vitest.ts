@@ -24,6 +24,12 @@ const PATH_DIR_WORKSPACE_VITEST_TS_VERSION = (version: string) => `${PATH_DIR_WO
 const PATH_FILE_WORKSPACE_PACKAGE_JSON = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}package.json` as const;
 const PATH_FILE_WORKSPACE_VITEST_CONFIG_TS = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}vitest.config.ts` as const;
 
+const TEMPLATE_LOAD = (templateDirRelativePath: string) => Handlebars.compile(fs.readFileSync(__join("./templates/", templateDirRelativePath), "utf-8"));
+const TEMPLATES = {
+    "workspace__package.json.hbs":     TEMPLATE_LOAD("workspace__package.json.hbs"),
+    "workspace__vitest.config.ts.hbs": TEMPLATE_LOAD("workspace__vitest.config.ts.hbs"),
+};
+
 /** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
 function safeRmdir() {
     /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
@@ -43,7 +49,7 @@ function safeRmdir() {
 
         for (const path of pathsToRemove) fs.statSync(path).isDirectory() ? fs.rmdirSync(path) : fs.rmSync(path);
 
-        fs.rmdirSync(__join(PATH_DIR_TEMP));
+        if (fs.existsSync(__join(PATH_DIR_TEMP))) fs.rmdirSync(__join(PATH_DIR_TEMP));
     } catch (error) {
         throw error;
     }
@@ -61,24 +67,35 @@ await async function main() {
     ;
 
     const { tsVersion, keepTemp = false, } = params;
+    const { devDependencies: { vitest: vitestVersionFromWorkspaceLatest, }, } = (await import("../../workspaces/vitest-ts-latest/package.json")).default;
 
     const spinner = ora();
 
     async function asyncOperation<R>(
         text: string,
         operationFn: (messageFns: {
-            succeed: (message: string) => void,
-            fail:    (message: string) => void,
+            succeed: (message?: string) => void,
+            fail:    (message: string | ((text: string) => string)) => void,
+            pause:   () => void,
+            resume:  () => void,
         }) => Promisable<R>,
     ) {
         spinner.start(text);
         const result = await operationFn({
             succeed(message) {
-                spinner.succeed(message);
+                const _message: string = message ?? text;
+                spinner.succeed(_message);
             },
             fail(message) {
-                spinner.fail(message);
-                throw new Error(message);
+                const _message: string = typeof message === "function" ? message(text) : message;
+                spinner.fail(_message);
+                throw new Error(_message);
+            },
+            pause() {
+                spinner.stopAndPersist();
+            },
+            resume() {
+                spinner.start(text);
             },
         });
         spinner.stop();
@@ -93,29 +110,29 @@ await async function main() {
             ;
 
             if (tsVersion_isAvailableOnNpm) {
-                succeed(`typescript@${tsVersion} is available`);
+                succeed();
             } else {
-                fail(`typescript@${tsVersion} is not available!`);
+                fail((text) => `${text}: version is not available on npm!`);
             }
         });
 
-        await asyncOperation(`Creating temp folder to aid transactional file changes`, async ({ succeed, fail, }) => {
+        await asyncOperation(`Creating temp folder "${PATH_DIR_TEMP}" to aid transactional file changes`, async ({ succeed, fail, }) => {
             try {
                 safeRmdir();
                 await fs.mkdir(join(import.meta.url, PATH_DIR_TEMP));
-                succeed(`Temp folder "${PATH_DIR_TEMP}" created`);
+                succeed();
             } catch (error) {
                 const msg = error instanceof Error ? error.message : error;
-                fail(`Creating temp folder to aid transactional file changes: couldn't create folder "${PATH_DIR_TEMP}": ${msg}`);
+                fail((text) => `${text}: couldn't create folder "${PATH_DIR_TEMP}": ${msg}`);
             }
         });
 
         const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
 
-        await asyncOperation(`Updating "package.json" with new workspace folder entry`, async ({ succeed, fail, }) => {
+        await asyncOperation(`Generating updated "package.json" with new workspace folder entry`, async ({ succeed, fail, }) => {
             const _workspace = `workspaces/vitest-ts-${tsVersion}` as const;
             const isWorkspaceAlreadyPresent = pkg.workspaces.includes(_workspace);
-            if (isWorkspaceAlreadyPresent) fail(`Updating "package.json" with new workspace folder entry: workspace already exists`);
+            if (isWorkspaceAlreadyPresent) fail((text) => `${text}: workspace already exists`);
 
             const workspaces = [_workspace, ...pkg.workspaces].sort();
             const _pkg = { ...pkg, workspaces, };
@@ -125,13 +142,14 @@ await async function main() {
                 await fs.writeFile(path_temp_package_json, JSON.stringify(_pkg, null, indent_size));
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
-                fail(`Updating "package.json" with new workspace folder entry: ${message}`);
+                fail((text) => `${text}: ${message}`);
             }
 
-            succeed(`Updating "package.json" with new workspace folder entry`);
+            succeed();
         });
 
-        await asyncOperation(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry`, async ({ succeed, fail, }) => {
+        const NPM_WORKSPACE_NEW = `workspaces/vitest-ts-${tsVersion}` as const;
+        await asyncOperation(`Generating updated "typeful-tuples.code-workspace" with new "folders.path" entry`, async ({ succeed, fail, }) => {
             type File_CodeWorkspace = {
                 "folders":  Array<{
                     "path": string,
@@ -144,11 +162,10 @@ await async function main() {
             const path_root_code_workspace = __join(PATH_DIR_ROOT, PATH_FILE_CODE_WORKSPACE);
             const file_code_workspace: File_CodeWorkspace = JSON.parse(await fs.readFile(path_root_code_workspace, "utf-8"));
 
-            const _workspace = `workspaces/vitest-ts-${tsVersion}` as const;
-            const isWorkspaceAlreadyPresent = file_code_workspace.folders.some(({ path, }) => path === _workspace);
-            if (isWorkspaceAlreadyPresent) fail(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry: workspace already exists`);
+            const isWorkspaceAlreadyPresent = file_code_workspace.folders.some(({ path, }) => path === NPM_WORKSPACE_NEW);
+            if (isWorkspaceAlreadyPresent) fail((text) => `${text}: workspace already exists`);
 
-            file_code_workspace.folders.push({ path: _workspace, });
+            file_code_workspace.folders.push({ path: NPM_WORKSPACE_NEW, });
             file_code_workspace.folders.sort((a, b) => a.path < b.path ? -1 : 1);
 
             try {
@@ -156,19 +173,19 @@ await async function main() {
                 await fs.writeFile(path_temp_code_workspace, JSON.stringify(file_code_workspace, null, indent_size));
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
-                fail(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry: ${message}`);
+                fail((text) => `${text}: ${message}`);
             }
 
-            succeed(`Updating "typeful-tuples.code-workspace" with new "folders.path" entry`);
+            succeed();
         });
 
         const path_workspace_package_json = PATH_FILE_WORKSPACE_PACKAGE_JSON(tsVersion);
         await asyncOperation(`Generating "${path_workspace_package_json}"`, async ({ succeed, fail, }) => {
-            const template = Handlebars.compile(fs.readFileSync(__join("./workspace__package_json.hbs"), "utf-8"));
+            const template = TEMPLATES["workspace__package.json.hbs"];
             const rendered = template({
-                json_name:                       "TODO",
-                json_devDependencies_typescript: "TODO 2",
-                json_devDependencies_vitest:     "TODO 3",
+                json_name:                       `vitest-ts-${tsVersion}`,
+                json_devDependencies_typescript: `${tsVersion}`,
+                json_devDependencies_vitest:     `${vitestVersionFromWorkspaceLatest}`,
             });
 
             try {
@@ -176,25 +193,55 @@ await async function main() {
                 await fs.outputFile(path_temp_workspace_package_json, rendered);
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
-                fail(`Generating "${path_workspace_package_json}": ${message}`);
+                fail((text) => `${text}: ${message}`);
             }
 
-            succeed(`Generating "${path_workspace_package_json}"`);
+            succeed();
         });
 
         const path_workspace_vitest_config_ts = PATH_FILE_WORKSPACE_VITEST_CONFIG_TS(tsVersion);
         await asyncOperation(`Generating "${path_workspace_vitest_config_ts}"`, async ({ succeed, fail, }) => {
-            const rendered = `TODO`;
+            const template = TEMPLATES["workspace__vitest.config.ts.hbs"];
+            const rendered = template({
+                config_expectedTypescriptVersion: `${tsVersion}`,
+            });
 
             try {
                 const path_temp_workspace_vitest_config_ts = __join(PATH_DIR_TEMP, path_workspace_vitest_config_ts);
                 await fs.outputFile(path_temp_workspace_vitest_config_ts, rendered);
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
-                fail(`Generating "${path_workspace_vitest_config_ts}": ${message}`);
+                fail((text) => `${text}: ${message}`);
             }
 
-            succeed(`Generating "${path_workspace_vitest_config_ts}"`);
+            succeed();
+        });
+
+        await asyncOperation(`Copying generated files from "${PATH_DIR_TEMP}" to project`, async ({ succeed, fail, }) => {
+            try {
+                await fs.copy(__join(PATH_DIR_TEMP), __join(PATH_DIR_ROOT));
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail((text) => `${text}: ${message}`);
+            }
+
+            succeed();
+        });
+
+        await asyncOperation(`Running npm install to integrate new workspace "${NPM_WORKSPACE_NEW}"`, async ({ succeed, fail, pause, resume, }) => {
+            try {
+                pause();
+                const proc = execa(`npm install`);
+                proc.pipeStdout?.(process.stdout);
+                proc.pipeStderr?.(process.stderr);
+                await proc;
+                resume();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail((text) => `${text}: ${message}`);
+            }
+
+            succeed();
         });
 
         console.info();
@@ -219,19 +266,3 @@ await async function main() {
 
 
 }();
-
-async function waitFor(ms?: number) { return new Promise<void>((resolve) => { setTimeout(() => resolve(), ms); }); }
-
-
-function generateFiles() {
-    const context_typescriptVersion = `5.4.5`;
-
-    function workspace_file__package_json() {
-        const context_name = `vitest-ts-${context_typescriptVersion}`;
-        const context_devDependencies_typescriptVersion = `${context_typescriptVersion}`;
-        const context_vitestPinnedVersion = `1.5.2`;
-    }
-    function workspace_file__vitest_config_ts() {
-        const context_expectedTypescriptVersion = `${context_typescriptVersion}`;
-    }
-}

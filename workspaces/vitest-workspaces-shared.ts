@@ -1,18 +1,34 @@
 import type { Plugin, UserConfig } from "vite";
 import chalk from "chalk";
 
-export type ExpectedTsVersionString = `${number}.${number}.${number}` | `ignore_version`;
+export type SemverString = `${number}.${number}.${number}`;
+export type ExpectedTsVersionString = SemverString | `ignore_version`;
 /** Use with `mergeConfig`, otherwise test.excludes*/
-export function vitestConfigBase_forSpecificTsVersionWorkspace(expectedVersion: ExpectedTsVersionString): UserConfig {
+export function vitestConfigBase_forSpecificTsVersionWorkspace(
+    expectedVersion: ExpectedTsVersionString,
+    /**
+     * What you probably need to put here:
+     * ```ts
+     * async () => (await import("typescript")).default.version
+     * ```
+     *
+     * This is necessary, because ESM (dynamic) imports are evaluated relative to the calling module,
+     * so the calling `vitest.config.ts` has to import `typescript`.
+     *
+     * It cannot be delegated to the internals of this function, because this file is placed in the project root,
+     * and would resolve to the root `typescript` package, not the workspace's.
+     */
+    getTsVersion: () => Promise<string>,
+): UserConfig {
     return {
-        plugins: [plugin_typescriptVersionAssert(expectedVersion)],
+        plugins: [plugin_typescriptVersionAssert(expectedVersion, getTsVersion)],
         test:    {
             root: `../source`, // This is relative to the specific `vitest.config.ts` file this is used in
         },
     };
 }
 
-function plugin_typescriptVersionAssert(expectedVersion: ExpectedTsVersionString): Plugin {
+function plugin_typescriptVersionAssert(expectedVersion: ExpectedTsVersionString, getTsVersion: () => Promise<string>): Plugin {
     const name = "TypeScript Version Assert";
     return {
         name,
@@ -24,7 +40,7 @@ function plugin_typescriptVersionAssert(expectedVersion: ExpectedTsVersionString
             console.info(chalk.gray     (`        Checks for correctly pinned ${msg_typescript} version.`));
             console.info();
 
-            const { version, } = (await import("typescript")).default;
+            const version = await getTsVersion();
 
             if (expectedVersion === `ignore_version`) {
                 console.info(`${chalk.cyanBright(`Actual version is `)}${version}${chalk.cyanBright(`, with no expected ${msg_typescript} version, skipping check ⏩`)}`);
