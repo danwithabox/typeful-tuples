@@ -21,10 +21,40 @@ TODO: seed on all found search results
 - https://www.reddit.com/r/typescript/comments/182fkh1/how_do_i_ensure_array_members_are_unique/
 
 TODO: testing multiple versions
-- latest version workspace
-- handlebars codegen
-- run latest, 5.4.5, and 5.3.3 in sequence
+- ts-vitest-versioner
+    - FLAG
+        - shortcuts to updates?
+    - MENU
+        - list
+            - latest (5.4.5)
+            - rc (5.5.0-rc)
+            - beta (5.5.0-beta)
+            - next (5.5.0-dev.20240101)
+            - 5.4.0
+        - vitest
+            - > update vitest (1.5.2 -> 1.5.3)
+            - > ~~update vitest (already latest)~~
+        - update
+            - [ ] update pinned - latest (5.4.5 -> 5.4.6)
+            - [ ] ~~update pinned - latest (5.4.5 - already latest)~~
+            - [ ] update pinned - rc (5.5.0-rc -> 5.6.0-rc)
+            - [ ] ~~update pinned - rc (5.5.0-rc - already latest)~~
+            - [ ] update pinned - beta (5.5.0-beta -> 5.6.0-beta)
+            - [ ] ~~update pinned - beta (5.5.0-beta - already latest)~~
+            - [ ] update pinned - next (5.5.0-dev.20240101 -> 5.6.0-20240102)
+        - generate
+            - > Custom input
+                - Slow-validate input
+            - > ~~5.4.0~~
+        - delete
+            - > ~~latest (5.4.5)~~
+            - > ~~beta (5.5.0-beta)~~
+            - > 5.4.0
 
 TODO:
 - tested TS versions as peer dependency? check how type-fest and typebox does it
-    - maybe don't, because it has no runtime effect? so failing an isntall on this would be unnecessary?
+    - maybe don't, because it has no runtime effect? so failing an install on this would be unnecessary?
+- npx npm-packlist
+    - is .editorconfig and LICENSE supposed to be packed?
+        - are they even packed?
+            - what's the command for packing without publish to inspect it?

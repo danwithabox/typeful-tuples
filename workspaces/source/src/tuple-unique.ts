@@ -15,23 +15,31 @@ export type UniqueTuple<T> =
         : T // Deliberately not `never`, to make inference of `T` possible in functions
 ;
 
+export type NonEmptyStringTuple<T> =
+    T extends readonly [...infer Rest, infer H]
+        ? [H] extends [""]
+            ? readonly [...UniqueTuple<Rest>, never]
+            : readonly [...UniqueTuple<Rest>, H]
+        : T // Deliberately not `never`, to make inference of `T` possible in functions
+;
+
 export type DepletingTuple<T, TUnused, TExhaustive extends boolean> =
     T extends readonly [] // Empty case
         ? [TUnused] extends [never]
             ? []
-            : [TExhaustive] extends [false] ? ([TUnused] | []) : [TUnused]
+            : [TExhaustive] extends [false] ? (readonly [TUnused] | readonly []) : readonly [TUnused]
         // : T extends readonly [infer H] // One element case
         //     ? [H] extends [""]
-        //         ? [...Exhaustive<readonly [], Exclude<TUnused, T[number]>, TExhaust>] // TODO: UNSURE why not TUnused
-        //         : [H, ...Exhaustive<readonly [], Exclude<TUnused, T[number]>, TExhaust>]
+        //         ? [...DepletingTuple<readonly [], Exclude<TUnused, T[number]>, TExhaustive>] // TODO: UNSURE why not TUnused
+        //         : [H, ...DepletingTuple<readonly [], Exclude<TUnused, T[number]>, TExhaustive>]
             : T extends readonly [infer H, ...infer Rest] // One, or more than one element case
                 ? [H] extends [""]
-                    ? [TUnused, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
-                    : [H, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
+                    ? readonly [TUnused, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
+                    : readonly [H, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
                 : T
 ;
 
-export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>) { return values; }
+export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): T { return values as T; }
 
 export function tupleUniqueOf<const V>() {
     return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): T { return values as T; };
