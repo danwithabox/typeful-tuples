@@ -1,5 +1,5 @@
 {
-	"folders": [
+    "folders": [
         {
             "path": "."
         },
@@ -7,13 +7,16 @@
             "path": "workspaces/source"
         },
         {
-            "path": "workspaces/vitest-ts-latest"
+            "path": "workspaces/vitest-ts-5.4.5"
         },
         {
-            "path": "workspaces/vitest-ts-5.4.5"
+            "path": "workspaces/vitest-ts-5.5.0-beta"
+        },
+        {
+            "path": "workspaces/vitest-ts-latest"
         }
     ],
-	"settings": {
-		"typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib"
-	}
+    "settings": {
+        "typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib"
+    }
 }

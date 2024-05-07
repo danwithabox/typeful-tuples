@@ -1,3 +1,5 @@
+import type { TupleSimplify } from "./tuple-simplify.js";
+
 export type InTuple<T, E> =
     T extends readonly [E] // Present as the only element?
         ? true
@@ -12,14 +14,6 @@ export type UniqueTuple<T> =
         ? InTuple<Rest, H> extends true // Is last element present in the rest of tuple `T`?
             ? readonly [...UniqueTuple<Rest>, never] // If so, mark duplicate element with `never`, and recursively check the rest
             : readonly [...UniqueTuple<Rest>, H] // Else, keep element, and recursively check the rest
-        : T // Deliberately not `never`, to make inference of `T` possible in functions
-;
-
-export type NonEmptyStringTuple<T> =
-    T extends readonly [...infer Rest, infer H]
-        ? [H] extends [""]
-            ? readonly [...UniqueTuple<Rest>, never]
-            : readonly [...UniqueTuple<Rest>, H]
         : T // Deliberately not `never`, to make inference of `T` possible in functions
 ;
 
@@ -39,12 +33,12 @@ export type DepletingTuple<T, TUnused, TExhaustive extends boolean> =
                 : T
 ;
 
-export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): T { return values as T; }
+export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): TupleSimplify<T> { return values as T; }
 
 export function tupleUniqueOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): T { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): TupleSimplify<T> { return values as T; };
 }
 
 export function tupleExhaustiveOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): T { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): TupleSimplify<T> { return values as T; };
 }
