@@ -1,4 +1,4 @@
-import type { TupleSimplify } from "./tuple-simplify.js";
+import type { _TupleSimplify } from "./tuple-simplify.js";
 
 export type InTuple<T, E> =
     T extends readonly [E] // Present as the only element?
@@ -33,12 +33,12 @@ export type DepletingTuple<T, TUnused, TExhaustive extends boolean> =
                 : T
 ;
 
-export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): TupleSimplify<T> { return values as T; }
+export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): _TupleSimplify<T> { return values as T; }
 
 export function tupleUniqueOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): TupleSimplify<T> { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): _TupleSimplify<T> { return values as T; };
 }
 
 export function tupleExhaustiveOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): TupleSimplify<T> { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): _TupleSimplify<T> { return values as T; };
 }
