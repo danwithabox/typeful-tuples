@@ -1,3 +1,6 @@
+# Vitest
+tsconfig.vitest-temp.json
+
 # Build output
 lib
 .tsup
