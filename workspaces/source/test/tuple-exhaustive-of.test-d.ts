@@ -1,33 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { tuple, tupleUnique, tupleOf, tupleUniqueOf, tupleExhaustiveOf, type DepletingTuple } from "../src/index.js";
-
-test(`tupleExhaustiveOf // TODO: improve test`, () => {
-    type Keys = "foo" | "bar" | "baz" | "yay" | "nay";
-
-    const curry = tupleExhaustiveOf<Keys>();
-    const result = curry(["bar", "foo", "baz", "nay", "yay"]);
-
-    const result2 = tupleExhaustiveOf<Keys>()(["foo", "nay", "yay", "bar", "baz"]);
-    const result3 = tupleUniqueOf<Keys>()(["foo", "baz", "yay", "bar"]);
-    const result4 = tupleUniqueOf<Keys>()(["bar"]);
-    // @ts-expect-error invalid
-    const result5 = tupleUniqueOf<Keys>()(["bar", "bar"]);
-    const result6 = tupleUnique(["foo"]); // TODO: rename to tupleUnique?
-
-    const docEventMap = tupleUniqueOf<keyof DocumentEventMap>()(["focus", "blur", "abort"]);
-
-    // TODO: first element is anything, fix that
-    // TODO: mention, that only maybe UniqueTuple<T> is recommend to be used as a parameter,
-    //       everything else should be used as a "source of truth", and then only accept tuples
-
-    type res1 = DepletingTuple<["foo"], Keys, never>;
-    type resX = DepletingTuple<["foo", ""], Keys, never>;
-    type res2 = DepletingTuple<["foo", "bar"], Keys, never>;
-    type res3 = DepletingTuple<["foo", "bar", "baz"], Keys, never>;
-    type res4 = DepletingTuple<["foo", "bar", "baz", "yay"], Keys, never>;
-    type res5 = DepletingTuple<["foo", "bar", "baz", "yay", "nay"], Keys, never>;
-});
-
+import { tuple, tupleOf, tupleExhaustiveOf } from "../src/index.js";
 
 type Allowed = "1" | "2" | "3";
 
@@ -97,7 +69,7 @@ test(`tupleExhaustiveOf() checks for non-unique elements`, () => {
     }
 });
 
-test(`tupleOf() checks for not allowed elements`, () => {
+test(`tupleExhaustiveOf() checks for not allowed elements`, () => {
     const output = tupleExhaustiveOf<Allowed>()([
         "1",
         "2",
@@ -137,4 +109,86 @@ test(`tupleOf() checks for not allowed elements`, () => {
     }
 });
 
-// TODO: test for exhaustiveness
+test(`tupleExhaustiveOf() checks for exhaustiveness`, () => {
+    {
+        const output = tupleExhaustiveOf<Allowed>()(
+            // @ts-expect-error Source has 2 element(s) but target requires 3. ts(2345)
+            ["1", "2"],
+        );
+        expectTypeOf(output).toEqualTypeOf<["1", "2"]>();
+    }
+
+    {
+        const input = ["1", "2"] as const;
+        const output = tupleExhaustiveOf<Allowed>()(
+            // @ts-expect-error Source has 2 element(s) but target requires 3. ts(2345)
+            input,
+        );
+        expectTypeOf(output).toEqualTypeOf<readonly ["1", "2"]>();
+    }
+});
+
+test(`tupleExhaustiveOf autocomplete checks`, () => {
+    type Keys = "foo" | "bar" | "baz";
+
+    const curried = tupleExhaustiveOf<Keys>();
+
+    {
+        // All options are used up without error, so each element can only be the element itself
+        curried(["foo", "bar", "baz"]);
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"baz"` and `"foo"`
+        curried([""]);
+        expectTypeOf(curried<[""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo" | "bar" | "baz">();
+    }
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"foo"`
+        curried(["baz", ""]);
+        expectTypeOf(curried<["baz", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"baz">();
+        expectTypeOf(curried<["baz", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"foo" | "bar">();
+    }
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"foo"`
+        curried(["", "baz"]);
+        expectTypeOf(curried<["", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo" | "bar">();
+        expectTypeOf(curried<["", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"`
+        curried(["", "bar", "baz"]);
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"`
+        curried(["foo", "", "baz"]);
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"baz"`
+        curried(["foo", "bar", ""]);
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"baz"`
+        curried(["foo", "bar", "baz", ""]);
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(3).toEqualTypeOf<never>();
+    }
+});

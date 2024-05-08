@@ -13,6 +13,8 @@ TODO:
     - and make an open issue about it
     - and reference the upstream TS issue: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
 - type-only examples and tests
+    - make sure types are named as such they can be used when exported
+    - document which types can be used and if they can be used, how
 - decide if TS peer dependency is needed
     - check type-fest for guideline
     - list which versions of TS it works with, maybe run tests for other versions somehow?

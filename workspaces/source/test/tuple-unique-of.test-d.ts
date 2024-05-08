@@ -70,41 +70,108 @@ test(`tupleUniqueOf() checks for non-unique elements`, () => {
 });
 
 test(`tupleOf() checks for not allowed elements`, () => {
-    const output = tupleUniqueOf<Allowed>()([
-        "1",
-        "2",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
-    expectTypeOf(output).toEqualTypeOf<readonly ("" | Allowed)[]>();
+    {
+        const output = tupleUniqueOf<Allowed>()([
+            "1",
+            "2",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
+        expectTypeOf(output).toEqualTypeOf<readonly ("" | Allowed)[]>();
 
-    tupleUniqueOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        "2",
-        "3",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            "2",
+            "3",
+        ]);
 
-    tupleUniqueOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        "2",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            "2",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
 
-    tupleUniqueOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        // @ts-expect-error invalid input
-        "4",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            // @ts-expect-error invalid input
+            "4",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
+    }
 
     {
         const input = ["4", "2", "4"] as const;
         // @ts-expect-error invalid input
         const output = tupleUniqueOf<Allowed>()(input);
+    }
+});
+
+test(`tupleUniqueOf autocomplete checks`, () => {
+    type Keys = "foo" | "bar" | "baz";
+
+    const curried = tupleUniqueOf<Keys>();
+
+    {
+        // All options are used up without error, so each element can only be the element itself
+        curried(["foo", "bar", "baz"]);
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"baz"` and `"foo"`
+        curried([""]);
+        expectTypeOf(curried<[""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo" | "bar" | "baz">();
+    }
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"foo"`
+        curried(["baz", ""]);
+        expectTypeOf(curried<["baz", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"baz">();
+        expectTypeOf(curried<["baz", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"foo" | "bar">();
+    }
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"` and `"foo"`
+        curried(["", "baz"]);
+        expectTypeOf(curried<["", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo" | "bar">();
+        expectTypeOf(curried<["", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"`
+        curried(["", "bar", "baz"]);
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["", "bar", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"bar"`
+        curried(["foo", "", "baz"]);
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "", "baz"]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"baz"`
+        curried(["foo", "bar", ""]);
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", ""]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+    }
+
+    {
+        // @ts-expect-error Bring up autocomplete inside the parameter `""`, the options should be `"baz"`
+        curried(["foo", "bar", "baz", ""]);
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(0).toEqualTypeOf<"foo">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(1).toEqualTypeOf<"bar">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(2).toEqualTypeOf<"baz">();
+        expectTypeOf(curried<["foo", "bar", "baz", ""]>).parameter(0).toHaveProperty(3).toEqualTypeOf<never>();
     }
 });

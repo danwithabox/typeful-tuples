@@ -22,23 +22,19 @@ export type DepletingTuple<T, TUnused, TExhaustive extends boolean> =
         ? [TUnused] extends [never]
             ? []
             : [TExhaustive] extends [false] ? (readonly [TUnused] | readonly []) : readonly [TUnused]
-        // : T extends readonly [infer H] // One element case
-        //     ? [H] extends [""]
-        //         ? [...DepletingTuple<readonly [], Exclude<TUnused, T[number]>, TExhaustive>] // TODO: UNSURE why not TUnused
-        //         : [H, ...DepletingTuple<readonly [], Exclude<TUnused, T[number]>, TExhaustive>]
-            : T extends readonly [infer H, ...infer Rest] // One, or more than one element case
-                ? [H] extends [""]
-                    ? readonly [TUnused, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
-                    : readonly [H, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
-                : T
+        : T extends readonly [infer H, ...infer Rest] // One, or more than one element case
+            ? [H] extends [""]
+                ? readonly [Exclude<TUnused, T[number]>, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
+                : readonly [H, ...DepletingTuple<Rest, Exclude<TUnused, T[number]>, TExhaustive>]
+            : T
 ;
 
-export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): _TupleSimplify<T> { return values as T; }
+export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): _TupleSimplify<T> { return values as _TupleSimplify<T>; }
 
 export function tupleUniqueOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): _TupleSimplify<T> { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): _TupleSimplify<T> { return values as _TupleSimplify<T>; };
 }
 
 export function tupleExhaustiveOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): _TupleSimplify<T> { return values as T; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): _TupleSimplify<T> { return values as _TupleSimplify<T>; };
 }
