@@ -5,8 +5,9 @@ const typescript = flatConfigFilterRules(
     flatConfigDefineRules({
         ...rules_config_typescript(),
     }),
-    "exclude",
-    [],
+    {
+        exclude: [],
+    },
 );
 
 export default defineFlatConfig([
