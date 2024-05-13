@@ -4,6 +4,13 @@ README:
 - a word about reliability - covered by tests for various TS versions, no heavy type-system abuse
 
 TODO:
+- usability test
+    - when having to use as a param, don't try to incorporate the signature, instead expect a dumb array param, and provide the array with this utility at the callsite
+        - unfortunately, the type inference is not simple enough to just incorporate in your own functions, could be an improvement later
+        - actually, this may not be true, maybe it's an inference issue usually
+        - can we then recommend this? still no, because inference-protection would have to be imitated, the util provides it instead
+
+TODO:
 - real life example
 - disclaimer that this is for TS only, just a type-level thing, so it's lightweight
 - credit inspiration
