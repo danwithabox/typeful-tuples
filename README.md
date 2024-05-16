@@ -11,6 +11,7 @@ TODO:
         - can we then recommend this? still no, because inference-protection would have to be imitated, the util provides it instead
 
 TODO:
+- JSDocs
 - real life example
 - disclaimer that this is for TS only, just a type-level thing, so it's lightweight
 - credit inspiration
@@ -67,3 +68,7 @@ TODO:
     - is .editorconfig and LICENSE supposed to be packed?
         - are they even packed?
             - what's the command for packing without publish to inspect it?
+- if I could access VSCode from a browser, I could run Playwright against the actual autocomplete popups
+    - or use some other way to directly test autocompletes, e.g. language server
+        - https://github.com/microsoft/vscode-languageserver-node
+        - https://github.com/Microsoft/language-server-protocol/issues/313
