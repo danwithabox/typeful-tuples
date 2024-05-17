@@ -1,4 +1,4 @@
-import type { _InferenceBoxedTuple, _TupleSimplify } from "./tuple-types.js";
+import type { TupleNoInfer } from "./tuple-types.js";
 
 export type InTuple<T, E> =
     T extends readonly [E] // Present as the only element?
@@ -29,19 +29,12 @@ export type DepletingTuple<T, TUnused, TExhaustive extends boolean> =
             : T
 ;
 
-export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): _TupleSimplify<T> { return values as _TupleSimplify<T>; }
-tupleUnique.box = function <const V, T extends readonly V[]>(values: UniqueTuple<T>): _InferenceBoxedTuple<T> { return { unbox: tupleUnique<V, T>(values), }; };
+export function tupleUnique<const V, T extends readonly V[]>(values: UniqueTuple<T>): TupleNoInfer<T> { return values as any; }
 
 export function tupleUniqueOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): _TupleSimplify<T> { return values as _TupleSimplify<T>; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): TupleNoInfer<T> { return values as TupleNoInfer<T>; };
 }
-tupleUniqueOf.box = function <const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, false>>): _InferenceBoxedTuple<T> { return { unbox: tupleUniqueOf<V>()<T>(values), }; };
-};
 
 export function tupleExhaustiveOf<const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): _TupleSimplify<T> { return values as _TupleSimplify<T>; };
+    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): TupleNoInfer<T> { return values as TupleNoInfer<T>; };
 }
-tupleExhaustiveOf.box = function <const V>() {
-    return function <T extends readonly (V | "")[]>(values: UniqueTuple<DepletingTuple<T, V, true>>): _InferenceBoxedTuple<T> { return { unbox: tupleExhaustiveOf<V>()<T>(values), }; };
-};
