@@ -7,8 +7,6 @@ import assert from "node:assert";
  * https://github.com/microsoft/TypeScript/issues/5276
  */
 
-await
-
 function sandbox() {
     // {
     //     const obj = {
@@ -22,7 +20,7 @@ function sandbox() {
     //     const fn = (value: "foo" | "bar") => {};
     //     fn("");
     // }
-};
+}
 
 await async function main() {
 
