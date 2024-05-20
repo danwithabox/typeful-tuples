@@ -1,6 +1,8 @@
 {
     "recommendations": [
         "dbaeumer.vscode-eslint",
+        "aaron-bond.better-comments",
+        "bierner.comment-tagged-templates"
     ],
     "unwantedRecommendations": [
         "ms-vscode.vscode-typescript-tslint-plugin",

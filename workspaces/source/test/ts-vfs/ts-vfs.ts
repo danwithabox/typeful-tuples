@@ -1,51 +1,164 @@
-import { createDefaultMapFromNodeModules, createFSBackedSystem, createSystem, createVirtualTypeScriptEnvironment } from "@typescript/vfs";
+import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualTypeScriptEnvironment } from "@typescript/vfs";
 import ts from "typescript";
 import { join } from "desm";
 
-const relativeRoot = `../../`;
-console.log("root", join(import.meta.url, relativeRoot));
-const configFileName = ts.findConfigFile(
-    relativeRoot,
-    ts.sys.fileExists,
-    "tsconfig.json",
-);
-if (configFileName === void 0) throw new Error("tsconfig.json not found");
-const configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-const compilerOptions = ts.parseJsonConfigFileContent(
-    configFile.config,
-    ts.sys,
-    relativeRoot,
-).options;
-console.log("compilerOptions", compilerOptions);
+function createVirtualTs(params: {
+    /**
+     * Probably best to use an absolute path via `import.meta.url` with `join` from the `desm` pacakge.
+     * ```ts
+     * const absoluteProjectRoot = join(import.meta.url, `../../`);
+     * ```
+    */
+    projectRootPath: string,
+    ts:              typeof ts,
+    rootFiles?:      string[],
+}) {
+    const { projectRootPath, ts, rootFiles = [], } = params ?? {};
 
-const fsMap = new Map<string, string>();
+    const configFileName = ts.findConfigFile(
+        projectRootPath,
+        ts.sys.fileExists,
+        "tsconfig.json",
+    );
+    if (configFileName === void 0) {
+        throw new Error(
+            `Provided root path does not contain a tsconfig.json file. Please point to a folder with a tsconfig.json file. ` +
+            `Provided path: ${projectRootPath}`,
+        );
+    }
 
-const file = `index.ts`;
-// const tupleOf = <V>() => (v: V[]) => v;
-// tupleOf<"foo" | "bar">()([""]);
-const content = `
-import { tupleUniqueOf } from "../src/index.js";
-tupleUniqueOf<"foo" | "bar">()(["foo", ""]);
-`;
-fsMap.set(file, content);
+    const compilerOptions = function getCompilerOptions(params: { projectRootPath: string, }): ts.CompilerOptions {
+        const { projectRootPath, } = params;
 
-// By providing a project root, then the system knows how to resolve node_modules correctly
-const projectRoot = join(import.meta.url, relativeRoot);
-const system = createFSBackedSystem(fsMap, projectRoot, ts);
-const env = createVirtualTypeScriptEnvironment(system, [file], ts, compilerOptions);
-console.log(env.sys.resolvePath("./"));
-console.log("getCurrentDirectory", env.sys.getCurrentDirectory());
-console.log("getDirectories", env.sys.getDirectories("."));
+        const configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+        if (!configFile.config) {
+            console.warn(`ts.readConfigFile resulted in unusable config somehow, returning default config`);
+            return {};
+        }
+        const compilerOptions = ts.parseJsonConfigFileContent(
+            configFile.config,
+            ts.sys,
+            projectRootPath,
+        ).options;
+        return compilerOptions;
+    }({ projectRootPath, });
 
-// Requests auto-completions at `path.|`
-const completions = env.languageService.getCompletionsAtPosition(
-    file,
-    content.length - 5,
-    {},
-);
-// env.getSourceFile("index.ts")?.getPositionOfLineAndCharacter
-const source = env.getSourceFile("index.ts")?.fileName;
-const source2 = env.getSourceFile("../src/index.ts")?.fileName;
-console.log("source", source);
-console.log("source2", source2);
-console.log("completions", completions);
+    const { vfs, } = (() => {
+        const fsFileMap = new Map<string, string>();
+        const system = createFSBackedSystem(fsFileMap, projectRootPath, ts);
+        const env = createVirtualTypeScriptEnvironment(system, rootFiles, ts, compilerOptions);
+
+        const vfs = {
+            fsFileMap,
+            system,
+            env,
+        };
+        return { vfs, };
+    })();
+
+    const { tooling, } = (function createTooling(params: { vfsEnv: VirtualTypeScriptEnvironment, }) {
+        const { vfsEnv, } = params;
+
+        const _markers = {
+            /**
+             * Place this marker character in the returned content.
+             *
+             * The marker character will be removed, its position passed to the `getCompletionsAtPosition` query.
+             *
+             * The character is deliberately obscure to help avoid conflicts with the given source code.
+             *
+             * Only the first occurance is handled and removed.
+             */
+            $ʃ: `ʃ`,
+        } as const;
+        type _markers = typeof _markers;
+
+        function setFileRunQuery<S extends `${string}.ts`>(
+            op: "getCompletionsAtPosition",
+            fileName: S,
+            markedContentFn: ({ $ʃ, }: Pick<_markers, "$ʃ">) => string,
+            options?: ts.GetCompletionsAtPositionOptions,
+        ) {
+            const raw_content = markedContentFn(_markers);
+            const [content, pos] = (() => {
+                const index = raw_content.indexOf(_markers.$ʃ);
+                if (index === -1) return [raw_content, null];
+                return [raw_content.replace(_markers.$ʃ, ""), index];
+            })();
+
+            const doesFileExist = vfsEnv.getSourceFile(fileName) !== void 0;
+            if (doesFileExist) vfsEnv.updateFile(fileName, content);
+            else vfsEnv.createFile(fileName, content);
+
+            const raw_queryResult: ts.WithMetadata<ts.CompletionInfo> | undefined = (() => {
+                if (pos === null) return;
+                const queryResult = vfsEnv.languageService.getCompletionsAtPosition(fileName, pos, options);
+                return queryResult;
+            })();
+
+            const entries = raw_queryResult?.entries ?? [];
+            const entriesNames = entries.map(({ name, }) => name);
+
+            const queryResult = {
+                entries,
+                entriesNames,
+                raw: raw_queryResult,
+            };
+
+            return {
+                fileName,
+                content,
+                queryResult,
+            };
+        }
+
+        const tooling = {
+            setFileRunQuery,
+        };
+        return { tooling, };
+    })({ vfsEnv: vfs.env, });
+
+    return {
+        vfs,
+        tooling,
+    };
+}
+
+await async function main() {
+    const absoluteProjectRoot = join(import.meta.url, `../../`);
+
+    const {
+        vfs,
+        tooling: {
+            setFileRunQuery: runQueryOnVirtualFile,
+        },
+    } = createVirtualTs({
+        projectRootPath: absoluteProjectRoot,
+        ts,
+    });
+
+    // env.getSourceFile("index.ts")?.getPositionOfLineAndCharacter
+    // const source = env.getSourceFile("index.ts")?.fileName;
+    // const source2 = env.getSourceFile("../src/index.ts")?.fileName;
+
+    // console.log("source", source);
+    // console.log("source2", source2);
+    // console.log("completions", completions);
+
+
+
+
+
+
+
+
+
+
+
+    const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
+        import { tupleUniqueOf } from "../src/index.js";
+        tupleUniqueOf<"foo" | "bar">()(["foo", "${$ʃ}"]);
+    `);
+
+    console.log(result.queryResult.entriesNames);
+}();
