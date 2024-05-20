@@ -154,11 +154,26 @@ await async function main() {
 
 
 
+    /**
+     * TODO:
+     *  - import paths should be from root folder
+     *  - if possible: on createVirtualTs() init, compile-check that imports are available
+     *  - make sure typescript versions are honored in workspaces
+     */
+    {
+        const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
+            import { tupleUniqueOf } from "../src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["foo", "${$ʃ}"]);
+        `);
 
-    const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
-        import { tupleUniqueOf } from "../src/index.js";
-        tupleUniqueOf<"foo" | "bar">()(["foo", "${$ʃ}"]);
-    `);
+        console.log(result.queryResult.entriesNames);
+    }
+    {
+        const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
+            import { tupleUniqueOf } from "../src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["bar", "${$ʃ}"]);
+        `);
 
-    console.log(result.queryResult.entriesNames);
+        console.log(result.queryResult.entriesNames);
+    }
 }();
