@@ -2,7 +2,19 @@ import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualT
 import ts from "typescript";
 import { join } from "desm";
 
-function createVirtualTs(params: {
+type LnCol = {
+    /** 1-based, just like in the status bar of Visual Studio Code */
+    Ln:  number,
+    /** 1-based, just like in the status bar of Visual Studio Code */
+    Col: number,
+};
+
+/**
+ * Loosely based on:
+ * - https://github.com/microsoft/TypeScript/issues/32916
+ * - https://github.com/yunabe/tsapi-completions/blob/master/src/completions.spec.ts
+ */
+export function createVirtualTs(params: {
     /**
      * Probably best to use an absolute path via `import.meta.url` with `join` from the `desm` pacakge.
      * ```ts
@@ -10,7 +22,7 @@ function createVirtualTs(params: {
      * ```
     */
     projectRootPath: string,
-    ts:              typeof ts,
+    ts:              typeof import("typescript"),
     rootFiles?:      string[],
 }) {
     const { projectRootPath, ts, rootFiles = [], } = params ?? {};
@@ -50,7 +62,6 @@ function createVirtualTs(params: {
 
         const vfs = {
             fsFileMap,
-            system,
             env,
         };
         return { vfs, };
@@ -61,46 +72,59 @@ function createVirtualTs(params: {
 
         const _markers = {
             /**
-             * Place this marker character in the returned content.
+             * Place this marker character in the returned content at the desired cursor location.
              *
              * The marker character will be removed, its position passed to the `getCompletionsAtPosition` query.
              *
              * The character is deliberately obscure to help avoid conflicts with the given source code.
              *
-             * Only the first occurance is handled and removed.
+             * Only the first occurence is handled and removed.
              */
-            $ʃ: `ʃ`,
+            $c: `ᶜ`,
+            /**
+             * Place this marker character in the returned content on the desired line, recommended to be put at the end of the line.
+             *
+             * The marker character will be removed, its line number passed to the `getSemanticDiagnostics` query.
+             *
+             * The character is deliberately obscure to help avoid conflicts with the given source code.
+             *
+             * Only the first occurence is handled and removed.
+             */
+            $l: `ˡ`,
         } as const;
         type _markers = typeof _markers;
-
-        function setFileRunQuery<S extends `${string}.ts`>(
-            op: "getCompletionsAtPosition",
-            fileName: S,
-            markedContentFn: ({ $ʃ, }: Pick<_markers, "$ʃ">) => string,
-            options?: ts.GetCompletionsAtPositionOptions,
-        ) {
-            const raw_content = markedContentFn(_markers);
-            const [content, pos] = (() => {
-                const index = raw_content.indexOf(_markers.$ʃ);
-                if (index === -1) return [raw_content, null];
-                return [raw_content.replace(_markers.$ʃ, ""), index];
-            })();
-
+        function processMarkerInRawContent(rawContent: string, marker: keyof _markers) {
+            const index = rawContent.indexOf(_markers[marker]);
+            if (index === -1) return [rawContent, null] as const;
+            return [rawContent.replace(_markers[marker], ""), index] as const;
+        }
+        function upsertSourceFile(fileName: string, content: string) {
             const doesFileExist = vfsEnv.getSourceFile(fileName) !== void 0;
             if (doesFileExist) vfsEnv.updateFile(fileName, content);
             else vfsEnv.createFile(fileName, content);
+        }
+
+        function getCompletionsAtPosition<S extends string>(
+            fileName: S,
+            markedContentFn: ({ $c, }: Pick<_markers, "$c">) => string,
+            options?: ts.GetCompletionsAtPositionOptions,
+        ) {
+            const raw_content = markedContentFn(_markers);
+
+            const [content, position] = processMarkerInRawContent(raw_content, "$c");
+            upsertSourceFile(fileName, content);
 
             const raw_queryResult: ts.WithMetadata<ts.CompletionInfo> | undefined = (() => {
-                if (pos === null) return;
-                const queryResult = vfsEnv.languageService.getCompletionsAtPosition(fileName, pos, options);
+                if (position === null) return;
+                const queryResult = vfsEnv.languageService.getCompletionsAtPosition(fileName, position, options);
                 return queryResult;
             })();
 
-            const entries = raw_queryResult?.entries ?? [];
-            const entriesNames = entries.map(({ name, }) => name);
+            const entriesRaw = raw_queryResult?.entries ?? [];
+            const entriesNames = entriesRaw.map(({ name, }) => name);
 
             const queryResult = {
-                entries,
+                entriesRaw,
                 entriesNames,
                 raw: raw_queryResult,
             };
@@ -112,8 +136,92 @@ function createVirtualTs(params: {
             };
         }
 
+        /**
+         * If no line is marked with `$l`, then all semantis issues of the file are returned.
+         */
+        function getSemanticDiagnostics<S extends string>(
+            fileName: S,
+            markedContentFn: ({ $l, }: Pick<_markers, "$l">) => string,
+        ) {
+            const raw_content = markedContentFn(_markers);
+
+            upsertSourceFile(fileName, raw_content);
+            const [content, position] = processMarkerInRawContent(raw_content, "$l");
+            const targetLine = (() => {
+                if (position === null) return null;
+                const sourceFile = vfsEnv.getSourceFile(fileName);
+                if (sourceFile === void 0) return null;
+                const { line, character, } = sourceFile.getLineAndCharacterOfPosition(position);
+                return line;
+            })();
+            upsertSourceFile(fileName, content);
+
+            const raw_queryResult = (() => {
+                const diag_semantic = vfsEnv.languageService.getSemanticDiagnostics(fileName);
+                const sourceFile = vfsEnv.getSourceFile(fileName);
+                if (sourceFile === void 0) throw new Error("getSourceFile didn't return a file");
+
+                const diags: {
+                    diag:  ts.Diagnostic,
+                    lines: number[],
+                    start: LnCol & { position: number, },
+                    end:   LnCol & { position: number, },
+                }[] = [];
+                for (const diag of diag_semantic) {
+                    const { start, length, } = diag;
+
+                    if ((start === void 0) || (length === void 0)) continue;
+
+                    const { line: lineStarting, character: characterStarting, } = sourceFile.getLineAndCharacterOfPosition(start);
+                    const { line: lineEnding, character: characterEnding, } = sourceFile.getLineAndCharacterOfPosition(start + length);
+                    const isTargetLineWithinLineRange = (targetLine === null) || ((lineStarting <= targetLine) && (targetLine <= lineEnding));
+                    const lines = new Array((lineEnding - lineStarting) + 1).fill(lineStarting).map((_, i) => _ + i);
+                    if (isTargetLineWithinLineRange) diags.push({
+                        diag, lines,
+                        start: { Ln: lineStarting + 1, Col: characterStarting + 1, position: start, },
+                        end:   { Ln: lineEnding, Col: characterEnding + 1, position: start + length, },
+                    });
+                }
+                return diags;
+            })();
+
+            const entries = raw_queryResult ?? [];
+            const diagnosticsRaw = entries.map(({ diag, }) => diag);
+            const diagnostics = entries.map(({ diag, lines, start, end, }) => {
+                const { code, messageText, length, } = diag;
+                return { code, messageText, start, end, length, lines, };
+            });
+
+            const queryResult = {
+                diagnosticsRaw,
+                diagnostics,
+                raw: raw_queryResult,
+            };
+
+            return {
+                fileName,
+                content,
+                queryResult,
+            };
+        }
+
+        /**
+         * NOTE: the base path for virtual files is `./vfs`. Therefore, if you want to correctly import files, it's recommended to do this:
+         *
+         * ```ts
+         * runQueryOnVirtualFile("getCompletionsAtPosition", "../myFile.ts", ({ $c, }) => `
+         *     import { foo } from "./src/foo.js";
+         *     foo()
+         * `);
+         * ```
+         */
+        const runQueryOnVirtualFile = {
+            getCompletionsAtPosition,
+            getSemanticDiagnostics,
+        };
+
         const tooling = {
-            setFileRunQuery,
+            runQueryOnVirtualFile,
         };
         return { tooling, };
     })({ vfsEnv: vfs.env, });
@@ -124,20 +232,20 @@ function createVirtualTs(params: {
     };
 }
 
-await async function main() {
+async function main() {
     const absoluteProjectRoot = join(import.meta.url, `../../`);
 
     const {
         vfs,
         tooling: {
-            setFileRunQuery: runQueryOnVirtualFile,
+            runQueryOnVirtualFile,
         },
     } = createVirtualTs({
         projectRootPath: absoluteProjectRoot,
         ts,
     });
 
-    // env.getSourceFile("index.ts")?.getPositionOfLineAndCharacter
+
     // const source = env.getSourceFile("index.ts")?.fileName;
     // const source2 = env.getSourceFile("../src/index.ts")?.fileName;
 
@@ -145,35 +253,63 @@ await async function main() {
     // console.log("source2", source2);
     // console.log("completions", completions);
 
-
-
-
-
-
-
-
-
-
     /**
      * TODO:
-     *  - import paths should be from root folder
      *  - if possible: on createVirtualTs() init, compile-check that imports are available
+     *      - util to run code for errors
+     *          - utils: semantic error: code, messageText
      *  - make sure typescript versions are honored in workspaces
      */
+    // tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);
     {
-        const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
-            import { tupleUniqueOf } from "../src/index.js";
-            tupleUniqueOf<"foo" | "bar">()(["foo", "${$ʃ}"]);
+        const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, }) => /* ts */`
+            import { tupleUniqueOf } from "./src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["foo", "${$c}"]);
         `);
 
         console.log(result.queryResult.entriesNames);
     }
     {
-        const result = runQueryOnVirtualFile("getCompletionsAtPosition", "index.ts", ({ $ʃ, }) => /* ts */`
-            import { tupleUniqueOf } from "../src/index.js";
-            tupleUniqueOf<"foo" | "bar">()(["bar", "${$ʃ}"]);
+        const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, }) => /* ts */`
+            import { tupleUniqueOf } from "./src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["bar", "${$c}"]);
+            tupleUniqueOf<"foo" | "bar">()(["bar", {
+
+            }]);
         `);
 
         console.log(result.queryResult.entriesNames);
     }
-}();
+
+    {
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
+            import { tupleUniqueOf } from "./src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["bxar", {}]);${$l}
+            tupleUniqueOf<"foo" | "bar">()(["bar",{
+
+            }]);
+        `);
+
+        console.log("semantics 1", result.queryResult.diagnostics);
+    }
+    {
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
+            import { tupleUniqueOf } from "./src/index.js";
+            tupleUniqueOf<"foo" | "bar">()(["bar", ""]);
+            tupleUniqueOf<"foo" | "bar">()(["bar", {
+                ${$l}
+            }]);
+        `);
+
+        console.log("semantics 2", result.queryResult.diagnostics);
+    }
+    // TODO: this has a "next" method on its result for some reason
+    {
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
+            import { tupleExhaustiveOf } from "./src/index.js";
+            tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);${$l}
+        `);
+
+        console.log("semantics 3", result.queryResult.diagnostics);
+    }
+}

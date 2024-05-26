@@ -3,15 +3,9 @@
     "version": "1.0.0",
     "type": "module",
     "private": true,
-    "devDependencies": {
-        "@danwithabox/eslint-entree": "^0.3.0",
-        "@typescript/vfs": "^1.5.0",
-        "chalk": "^5.3.0",
-        "type-fest": "^4.18.1",
-        "typescript": "5.4.5"
-    },
     "scripts": {
-        "test": "npm run test-once --workspaces --if-present"
+        "test": "npm run test-once --workspaces --if-present",
+        "vitest-test": "vitest run --typecheck"
     },
     "bin": {
         "gen-vitest": "bin/gen-vitest/gen-vitest.ts"
@@ -36,5 +30,14 @@
         "handlebars": "^4.7.8",
         "ora": "^8.0.1",
         "tsx": "^4.7.3"
+    },
+    "devDependencies": {
+        "@danwithabox/eslint-entree": "^0.3.0",
+        "@typescript/vfs": "^1.5.0",
+        "chalk": "^5.3.0",
+        "type-fest": "^4.18.1",
+        "typescript": "5.4.5",
+        "typescript-5.4.5": "npm:typescript@5.4.5",
+        "typescript-5.5.0-beta": "npm:typescript@5.5.0-beta"
     }
 }

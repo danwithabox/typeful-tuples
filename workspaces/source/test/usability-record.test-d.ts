@@ -32,6 +32,9 @@ test(`inference doesn't break when using "tuple()" as props in "Record<Keys, any
     expectTypeOf(record_1).not.toEqualTypeOf<Correct>();
 });
 
+
+const asd = tupleUnique(["1", "2", "2"])
+
 test(`inference doesn't break when using "tupleUnique()" as props in "Record<Keys, any>", "Record<Keys, unknown>", but breaks with "Record<Keys, unknown[]>"`, () => {
     const record_0_any = {
         foo: tupleUnique(["1"]),
