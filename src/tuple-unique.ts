@@ -1,4 +1,4 @@
-import type { TupleNoInfer } from "./tuple-types.js";
+import type { TupleNoInfer } from "./tuple-types";
 
 export type InTuple<T, E> =
     T extends readonly [E] // Present as the only element?

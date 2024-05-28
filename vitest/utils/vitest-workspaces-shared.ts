@@ -18,8 +18,8 @@ export function vitestConfigWithAliasedTs(
     const config_toMerge = configToMerge ?? {};
     const config_premade: UserConfig = {
         test: {
-            name:        `Vitest Workspace for typescript@${expectedVersion}`,
-            root:        `./source`, // This is relative to the specific `vitest.config.ts` file this is used in
+            name:        `typescript@${expectedVersion}`,
+            root:        `./test`, // This is relative to the specific `vitest.config.ts` file this is used in
             globalSetup: [ // Paths are relative to process.cwd(), which should be the project root
                 `./vitest/global-setup/gs-typescript-assert.ts`,
             ],

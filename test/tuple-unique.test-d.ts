@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { tupleUnique } from "../src/index.js";
+import { tupleUnique } from "../src/index";
 
 test(`tupleUnique() returns the input type unchanged, non-const`, () => {
     {

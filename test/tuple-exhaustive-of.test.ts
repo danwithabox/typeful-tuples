@@ -1,8 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { tupleExhaustiveOf } from "../src/index.js";
-import { createVirtualTs } from "./ts-vfs/ts-vfs.js";
+import { tupleExhaustiveOf } from "../src/index";
+import { createVirtualTs, defineVirtualSourceFiles } from "../vitest/utils/ts-vfs/ts-vfs";
 import { join } from "desm";
 import ts from "typescript";
+
+const sf = defineVirtualSourceFiles([
+    { path: `../index.ts`, imports: [`./src/index.js`], },
+]);
 
 describe(`tupleExhaustiveOf()`, () => {
 
@@ -20,15 +24,14 @@ describe(`tupleExhaustiveOf()`, () => {
         const _createVirtualTs = () => {
             virtualTS = createVirtualTs({
                 projectRootPath: absoluteProjectRoot,
-                ts,
             });
         };
 
         beforeAll(() => {
             _createVirtualTs();
 
-            const importDiagnostics = virtualTS.tooling.runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
-                import { tupleExhaustiveOf } from "./src/index.js";${$l}
+            const importDiagnostics = virtualTS.tooling.runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+                import { tupleExhaustiveOf } from "${$imports["./src/index.js"]}";${$l}
             `);
             expect(importDiagnostics.queryResult.diagnostics).toEqual([]);
         });

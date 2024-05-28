@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, test } from "vitest";
-import { tupleOf, tupleUniqueOf, tupleExhaustiveOf, tupleUnique, tuple } from "../src/index.js";
+import { tupleOf, tupleUniqueOf, tupleExhaustiveOf, tupleUnique, tuple } from "../src/index";
 
 type Keys = "foo" | "bar" | "baz";
 type Allowed = "1" | "2" | "3";

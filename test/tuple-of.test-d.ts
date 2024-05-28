@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { tupleOf } from "../src/index.js";
+import { tupleOf } from "../src/index";
 
 type Allowed = "1" | "2" | "3";
 

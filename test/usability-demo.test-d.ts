@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { tuple, tupleOf, tupleUnique, tupleUniqueOf, tupleExhaustiveOf } from "../src/index.js";
+import { tuple, tupleOf, tupleUnique } from "../src/index";
 
 // TODO: add expected result types for all demos, make it obvious which result is intended and which is not
 

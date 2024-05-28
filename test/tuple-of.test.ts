@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { tupleOf } from "../src/index.js";
+import { tupleOf } from "../src/index";
 
 test(`tupleOf() returns the input value unchanged`, () => {
     const input = [1, 2, 3];

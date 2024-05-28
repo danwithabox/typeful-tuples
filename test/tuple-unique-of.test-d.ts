@@ -1,64 +1,64 @@
 import { expectTypeOf, test } from "vitest";
-import { tuple, tupleOf, tupleExhaustiveOf } from "../src/index.js";
+import { tuple, tupleOf, tupleUniqueOf } from "../src/index";
 
 type Allowed = "1" | "2" | "3";
 
-test(`tupleExhaustiveOf() cannot accept non-const input`, () => {
+test(`tupleUniqueOf() cannot accept non-const input`, () => {
     const input = [1];
     // @ts-expect-error unacceptable input
-    const output = tupleExhaustiveOf<Allowed>()(input);
+    const output = tupleUniqueOf<Allowed>()(input);
 
     // @ts-expect-error invalid
     expectTypeOf(output).toEqualTypeOf<typeof input>();
 });
 
-test(`tupleExhaustiveOf() returns the input type unchanged, as const`, () => {
+test(`tupleUniqueOf() returns the input type unchanged, as const`, () => {
     {
-        const input = ["1", "2", "3"] as const;
-        const output = tupleExhaustiveOf<Allowed>()(input);
+        const input = ["1"] as const;
+        const output = tupleUniqueOf<Allowed>()(input);
         expectTypeOf(output).toEqualTypeOf<typeof input>();
     }
     {
-        const input = tuple(["1", "2", "3"]);
-        const output = tupleExhaustiveOf<Allowed>()(input);
+        const input = tuple(["1"]);
+        const output = tupleUniqueOf<Allowed>()(input);
         expectTypeOf(output).toEqualTypeOf<typeof input>();
     }
     {
-        const input = tupleOf<Allowed>()(["1", "2", "3"]);
-        const output = tupleExhaustiveOf<Allowed>()(input);
+        const input = tupleOf<Allowed>()(["1"]);
+        const output = tupleUniqueOf<Allowed>()(input);
         expectTypeOf(output).toEqualTypeOf<typeof input>();
     }
     {
-        const output = tupleExhaustiveOf<Allowed>()(["1", "2", "3"]);
-        expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
+        const output = tupleUniqueOf<Allowed>()(["1"]);
+        expectTypeOf(output).toEqualTypeOf<["1"]>();
     }
 
     {
-        const curried = tupleExhaustiveOf<Allowed>();
-        const output = curried(["1", "2", "3"]);
-        expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
+        const curried = tupleUniqueOf<Allowed>();
+        const output = curried(["1"]);
+        expectTypeOf(output).toEqualTypeOf<["1"]>();
     }
     {
-        const curried = tupleExhaustiveOf<Allowed>();
-        const output = curried(["1", "2", "3"] as const);
-        expectTypeOf(output).toEqualTypeOf<readonly ["1", "2", "3"]>();
+        const curried = tupleUniqueOf<Allowed>();
+        const output = curried(["1"] as const);
+        expectTypeOf(output).toEqualTypeOf<readonly ["1"]>();
     }
 
     {
-        const output = tupleExhaustiveOf<Allowed>()(["1", "2", "3"] as const);
-        expectTypeOf(output).toEqualTypeOf<readonly ["1", "2", "3"]>();
+        const output = tupleUniqueOf<Allowed>()(["1"] as const);
+        expectTypeOf(output).toEqualTypeOf<readonly ["1"]>();
     }
 });
 
-test(`tupleExhaustiveOf() checks for non-unique elements`, () => {
+test(`tupleUniqueOf() checks for non-unique elements`, () => {
     {
         const input = ["1", "2", "3", "1"] as const;
         // @ts-expect-error invalid input
-        const output = tupleExhaustiveOf<Allowed>()(input);
+        const output = tupleUniqueOf<Allowed>()(input);
         expectTypeOf(output).toEqualTypeOf<typeof input>();
     }
     {
-        const output = tupleExhaustiveOf<Allowed>()([
+        const output = tupleUniqueOf<Allowed>()([
             "1",
             "2",
             "3",
@@ -69,69 +69,52 @@ test(`tupleExhaustiveOf() checks for non-unique elements`, () => {
     }
 });
 
-test(`tupleExhaustiveOf() checks for not allowed elements`, () => {
-    const output = tupleExhaustiveOf<Allowed>()([
-        "1",
-        "2",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
-    expectTypeOf(output).toEqualTypeOf<readonly ("" | Allowed)[]>();
+test(`tupleOf() checks for not allowed elements`, () => {
+    {
+        const output = tupleUniqueOf<Allowed>()([
+            "1",
+            "2",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
+        expectTypeOf(output).toEqualTypeOf<readonly ("" | Allowed)[]>();
 
-    tupleExhaustiveOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        "2",
-        "3",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            "2",
+            "3",
+        ]);
 
-    tupleExhaustiveOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        "2",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            "2",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
 
-    tupleExhaustiveOf<Allowed>()([
-        // @ts-expect-error invalid input
-        "4",
-        // @ts-expect-error invalid input
-        "4",
-        // @ts-expect-error invalid input
-        "4",
-    ]);
+        tupleUniqueOf<Allowed>()([
+            // @ts-expect-error invalid input
+            "4",
+            // @ts-expect-error invalid input
+            "4",
+            // @ts-expect-error invalid input
+            "4",
+        ]);
+    }
 
     {
         const input = ["4", "2", "4"] as const;
         // @ts-expect-error invalid input
-        const output = tupleExhaustiveOf<Allowed>()(input);
+        const output = tupleUniqueOf<Allowed>()(input);
     }
 });
 
-test(`tupleExhaustiveOf() checks for exhaustiveness`, () => {
-    {
-        const output = tupleExhaustiveOf<Allowed>()(
-            // @ts-expect-error Source has 2 element(s) but target requires 3. ts(2345)
-            ["1", "2"],
-        );
-        expectTypeOf(output).toEqualTypeOf<["1", "2"]>();
-    }
-
-    {
-        const input = ["1", "2"] as const;
-        const output = tupleExhaustiveOf<Allowed>()(
-            // @ts-expect-error Source has 2 element(s) but target requires 3. ts(2345)
-            input,
-        );
-        expectTypeOf(output).toEqualTypeOf<readonly ["1", "2"]>();
-    }
-});
-
-test(`tupleExhaustiveOf autocomplete checks`, () => {
+test(`tupleUniqueOf autocomplete checks`, () => {
     type Keys = "foo" | "bar" | "baz";
 
-    const curried = tupleExhaustiveOf<Keys>();
+    const curried = tupleUniqueOf<Keys>();
 
     {
         // All options are used up without error, so each element can only be the element itself

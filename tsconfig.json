@@ -1,10 +1,21 @@
 {
+    "exclude": [
+        "lib",
+        "eslint.config.js",
+        ".tsup"
+    ],
     "compilerOptions": {
+        "skipLibCheck": true,
         "module": "ESNext",
         "moduleResolution": "Bundler",
         "resolveJsonModule": true,
         "verbatimModuleSyntax": true,
         "strict": true,
+        "allowJs": true,
+        "sourceMap": true,
+        "declaration": true,
+        "declarationMap": true,
+        "outDir": "./lib",
         "types": [
             "node"
         ]

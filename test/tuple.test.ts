@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { tuple } from "../src/index.js";
+import { tuple } from "../src/index";
 
 test(`tuple() returns the input value unchanged`, () => {
     const input = [1, 2, 3];

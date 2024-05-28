@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { tupleOf, tupleUniqueOf, tupleExhaustiveOf, tupleUnique, tuple } from "../src/index.js";
+import { tupleOf, tupleUniqueOf, tupleExhaustiveOf, tupleUnique, tuple } from "../src/index";
 
 type Keys = "foo" | "bar" | "baz";
 type Allowed = "1" | "2" | "3";
@@ -33,7 +33,7 @@ test(`inference doesn't break when using "tuple()" as props in "Record<Keys, any
 });
 
 
-const asd = tupleUnique(["1", "2", "2"])
+const asd = tupleUnique(["1", "2", "2"]);
 
 test(`inference doesn't break when using "tupleUnique()" as props in "Record<Keys, any>", "Record<Keys, unknown>", but breaks with "Record<Keys, unknown[]>"`, () => {
     const record_0_any = {

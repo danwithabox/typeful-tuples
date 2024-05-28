@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { tuple } from "../src/index.js";
+import { tuple } from "../src/index";
 
 test(`tuple() returns the input type unchanged, non-const`, () => {
     {

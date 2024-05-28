@@ -1,4 +1,4 @@
-import type { TupleNoInfer } from "./tuple-types.js";
+import type { TupleNoInfer } from "./tuple-types";
 
 export type InferConstTuple<T> = T extends readonly [infer H, ...infer Rest] ? readonly [H, ...Rest] : T;
 

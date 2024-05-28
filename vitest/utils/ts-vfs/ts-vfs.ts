@@ -24,7 +24,7 @@ type VirtualFiles_Transform<T extends VirtualFile_Define[]> = Simplify<UnionToIn
  * ]);
  * ```
  */
-function defineVirtualSourceFiles<const T extends VirtualFile_Define[]>(virtualFiles: T): VirtualFiles_Transform<T> {
+export function defineVirtualSourceFiles<const T extends VirtualFile_Define[]>(virtualFiles: T): VirtualFiles_Transform<T> {
     const mapped = virtualFiles.reduce((acc, curr) => {
         const { path, imports: _imports, } = curr;
         const imports = _imports.reduce((acc, curr) => ({ ...acc, [curr]: curr, }), {} as VirtualFile["imports"]);
