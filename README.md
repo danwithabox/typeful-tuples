@@ -6,9 +6,6 @@ README:
 TODO:
 - usability test
     - when having to use as a param, don't try to incorporate the signature, instead expect a dumb array param, and provide the array with this utility at the callsite
-        - unfortunately, the type inference is not simple enough to just incorporate in your own functions, could be an improvement later
-        - actually, this may not be true, maybe it's an inference issue usually
-        - can we then recommend this? still no, because inference-protection would have to be imitated, the util provides it instead
 
 TODO:
 - JSDocs
@@ -21,10 +18,10 @@ TODO:
     - and make an open issue about it
     - and reference the upstream TS issue: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
 - type-only examples and tests
-    - make sure types are named as such they can be used when exported
+    - rename exported types
     - document which types can be used and if they can be used, how
-- decide if TS peer dependency is needed
-    - check type-fest for guideline
+- tested TS versions as peer dependency? check how type-fest and typebox does it
+    - maybe don't, because it has no runtime effect? so failing an install on this would be unnecessary?
     - list which versions of TS it works with, maybe run tests for other versions somehow?
 
 TODO: seed on all found search results
@@ -62,13 +59,7 @@ TODO: testing multiple versions
             - > 5.4.0
 
 TODO:
-- tested TS versions as peer dependency? check how type-fest and typebox does it
-    - maybe don't, because it has no runtime effect? so failing an install on this would be unnecessary?
 - npx npm-packlist
     - is .editorconfig and LICENSE supposed to be packed?
         - are they even packed?
             - what's the command for packing without publish to inspect it?
-- if I could access VSCode from a browser, I could run Playwright against the actual autocomplete popups
-    - or use some other way to directly test autocompletes, e.g. language server
-        - https://github.com/microsoft/vscode-languageserver-node
-        - https://github.com/Microsoft/language-server-protocol/issues/313

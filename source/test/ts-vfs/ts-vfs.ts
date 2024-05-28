@@ -1,6 +1,38 @@
 import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualTypeScriptEnvironment } from "@typescript/vfs";
 import ts from "typescript";
 import { join } from "desm";
+import type { Simplify, UnionToIntersection } from "type-fest";
+
+type VirtualFile_Define = { path: string, imports: string[], };
+type VirtualFile<T extends VirtualFile_Define = VirtualFile_Define> = Simplify<{
+    path:    T["path"],
+    imports: {[K in T["imports"][number]]: K; },
+}>;
+type VirtualFile_Entry<T extends VirtualFile_Define = VirtualFile_Define> = {
+    [K_P in T["path"]]: VirtualFile<T>
+};
+type VirtualFiles_Transform<T extends VirtualFile_Define[]> = Simplify<UnionToIntersection<{
+    [K in keyof T]: VirtualFile_Entry<T[K]>;
+}[number]>>;
+
+/**
+ * NOTE: the base path for virtual files is `./vfs`. Therefore, if you want to correctly set up files, it's recommended to do this:
+ *
+ * ```ts
+ * const sf = defineVirtualSourceFiles([
+ *     { path: `../index.ts`, imports: [`./src/index.js`], },
+ * ]);
+ * ```
+ */
+function defineVirtualSourceFiles<const T extends VirtualFile_Define[]>(virtualFiles: T): VirtualFiles_Transform<T> {
+    const mapped = virtualFiles.reduce((acc, curr) => {
+        const { path, imports: _imports, } = curr;
+        const imports = _imports.reduce((acc, curr) => ({ ...acc, [curr]: curr, }), {} as VirtualFile["imports"]);
+        const entry: VirtualFile = { path, imports, };
+        return { ...acc, [entry.path]: entry, };
+    }, {} as VirtualFile_Entry);
+    return mapped as VirtualFiles_Transform<T>;
+}
 
 type LnCol = {
     /** 1-based, just like in the status bar of Visual Studio Code */
@@ -22,10 +54,8 @@ export function createVirtualTs(params: {
      * ```
     */
     projectRootPath: string,
-    ts:              typeof import("typescript"),
-    rootFiles?:      string[],
 }) {
-    const { projectRootPath, ts, rootFiles = [], } = params ?? {};
+    const { projectRootPath, } = params ?? {};
 
     const configFileName = ts.findConfigFile(
         projectRootPath,
@@ -58,6 +88,7 @@ export function createVirtualTs(params: {
     const { vfs, } = (() => {
         const fsFileMap = new Map<string, string>();
         const system = createFSBackedSystem(fsFileMap, projectRootPath, ts);
+        const rootFiles: string[] = [];
         const env = createVirtualTypeScriptEnvironment(system, rootFiles, ts, compilerOptions);
 
         const vfs = {
@@ -104,12 +135,13 @@ export function createVirtualTs(params: {
             else vfsEnv.createFile(fileName, content);
         }
 
-        function getCompletionsAtPosition<S extends string>(
-            fileName: S,
-            markedContentFn: ({ $c, }: Pick<_markers, "$c">) => string,
+        function getCompletionsAtPosition<T extends VirtualFile>(
+            virtualFile: T,
+            markedContentFn: ({ $c, $imports, }: Pick<_markers, "$c"> & { $imports: T["imports"], }) => string,
             options?: ts.GetCompletionsAtPositionOptions,
         ) {
-            const raw_content = markedContentFn(_markers);
+            const { path: fileName, imports: $imports, } = virtualFile;
+            const raw_content = markedContentFn({ ..._markers, $imports, });
 
             const [content, position] = processMarkerInRawContent(raw_content, "$c");
             upsertSourceFile(fileName, content);
@@ -139,11 +171,12 @@ export function createVirtualTs(params: {
         /**
          * If no line is marked with `$l`, then all semantis issues of the file are returned.
          */
-        function getSemanticDiagnostics<S extends string>(
-            fileName: S,
-            markedContentFn: ({ $l, }: Pick<_markers, "$l">) => string,
+        function getSemanticDiagnostics<T extends VirtualFile>(
+            virtualFile: T,
+            markedContentFn: ({ $l, $imports, }: Pick<_markers, "$l"> & { $imports: T["imports"], }) => string,
         ) {
-            const raw_content = markedContentFn(_markers);
+            const { path: fileName, imports: $imports, } = virtualFile;
+            const raw_content = markedContentFn({ ..._markers, $imports, });
 
             upsertSourceFile(fileName, raw_content);
             const [content, position] = processMarkerInRawContent(raw_content, "$l");
@@ -205,16 +238,6 @@ export function createVirtualTs(params: {
             };
         }
 
-        /**
-         * NOTE: the base path for virtual files is `./vfs`. Therefore, if you want to correctly import files, it's recommended to do this:
-         *
-         * ```ts
-         * runQueryOnVirtualFile("getCompletionsAtPosition", "../myFile.ts", ({ $c, }) => `
-         *     import { foo } from "./src/foo.js";
-         *     foo()
-         * `);
-         * ```
-         */
         const runQueryOnVirtualFile = {
             getCompletionsAtPosition,
             getSemanticDiagnostics,
@@ -242,7 +265,6 @@ async function main() {
         },
     } = createVirtualTs({
         projectRootPath: absoluteProjectRoot,
-        ts,
     });
 
 
@@ -261,17 +283,23 @@ async function main() {
      *  - make sure typescript versions are honored in workspaces
      */
     // tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);
+
+    const sf = defineVirtualSourceFiles([
+        { path: `../index.ts`, imports: [`./src/index.js`], },
+        // { path: `../index2.ts`, imports: [`./src/index2.js`, `..src/index3.js`], },
+    ]);
+
     {
-        const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, }) => /* ts */`
-            import { tupleUniqueOf } from "./src/index.js";
+        const result = runQueryOnVirtualFile.getCompletionsAtPosition(sf["../index.ts"], ({ $c, $imports, }) => /* ts */`
+            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
             tupleUniqueOf<"foo" | "bar">()(["foo", "${$c}"]);
         `);
 
         console.log(result.queryResult.entriesNames);
     }
     {
-        const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, }) => /* ts */`
-            import { tupleUniqueOf } from "./src/index.js";
+        const result = runQueryOnVirtualFile.getCompletionsAtPosition(sf["../index.ts"], ({ $c, $imports, }) => /* ts */`
+            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
             tupleUniqueOf<"foo" | "bar">()(["bar", "${$c}"]);
             tupleUniqueOf<"foo" | "bar">()(["bar", {
 
@@ -282,8 +310,8 @@ async function main() {
     }
 
     {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
-            import { tupleUniqueOf } from "./src/index.js";
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+        import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
             tupleUniqueOf<"foo" | "bar">()(["bxar", {}]);${$l}
             tupleUniqueOf<"foo" | "bar">()(["bar",{
 
@@ -293,8 +321,8 @@ async function main() {
         console.log("semantics 1", result.queryResult.diagnostics);
     }
     {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
-            import { tupleUniqueOf } from "./src/index.js";
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
             tupleUniqueOf<"foo" | "bar">()(["bar", ""]);
             tupleUniqueOf<"foo" | "bar">()(["bar", {
                 ${$l}
@@ -305,8 +333,8 @@ async function main() {
     }
     // TODO: this has a "next" method on its result for some reason
     {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, }) => /* ts */`
-            import { tupleExhaustiveOf } from "./src/index.js";
+        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+            import { tupleExhaustiveOf } from "${$imports["./src/index.js"]}";
             tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);${$l}
         `);
 

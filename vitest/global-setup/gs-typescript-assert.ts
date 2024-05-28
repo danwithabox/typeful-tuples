@@ -6,7 +6,7 @@ import { assertTypescriptVersion } from "../utils/vitest-workspaces-shared";
 export default async function ({ config, provide, }: GlobalSetupContext) {
     const typescriptAliasExpectedVersion = config.env[ENV_TS_ALIASED_EXPECTED];
 
-    assertTypescriptVersion(typescriptAliasExpectedVersion, async () => ts);
+    assertTypescriptVersion(typescriptAliasExpectedVersion, ts);
 
     provide("typescriptAliasExpectedVersion", typescriptAliasExpectedVersion);
 
