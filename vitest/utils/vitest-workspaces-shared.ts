@@ -24,7 +24,7 @@ export function vitestConfigWithAliasedTs(
                 `./vitest/global-setup/gs-typescript-assert.ts`,
             ],
             setupFiles: [ // Paths are relative to process.cwd(), which should be the project root
-                `./vitest/setup-files/sf-typescript-assert.ts`,
+                `./vitest/setup-files/sf-virtual-typescript.ts`,
             ],
             sequence: {
                 hooks:      "list",
