@@ -1,6 +1,7 @@
-import type { Plugin, UserConfig } from "vite";
+import { mergeConfig, type Plugin, type UserConfig } from "vite";
 import chalk from "chalk";
 import type { LiteralUnion } from "type-fest";
+import { ENV_TS_ALIASED_EXPECTED } from "../vitest";
 
 type ts = typeof import("typescript");
 
@@ -43,22 +44,22 @@ export function vitestConfigBase_forSpecificTsVersionWorkspace(
         },
     };
 }
-export function NEXT_vitestConfigBase_forSpecificTsVersionWorkspace(
-    expectedVersion: ExpectedTsVersionString,
+export function vitestConfigWithAliasedTs(
+    expectedVersion: string,
+    configToMerge?: UserConfig,
 ): UserConfig {
     const npmAlias_typescript = `typescript-${expectedVersion}` as const;
-    const getWorkspaceLocalTypescript = async () => {
-        const ts: ts = (await import(npmAlias_typescript)).default;
-        return ts;
-    };
 
-    return {
-        plugins: [plugin_typescriptVersionAssert(expectedVersion, getWorkspaceLocalTypescript)],
-        test:    {
-            name:       `Vitest Workspace for typescript@${expectedVersion}`,
-            root:       `./workspaces/source`, // This is relative to the specific `vitest.config.ts` file this is used in
+    const config_toMerge = configToMerge ?? {};
+    const config_premade: UserConfig = {
+        test: {
+            name:        `Vitest Workspace for typescript@${expectedVersion}`,
+            root:        `./workspaces/source`, // This is relative to the specific `vitest.config.ts` file this is used in
+            globalSetup: [
+                `../../vitest/global-setup/gs-typescript-assert.ts`,
+            ],
             setupFiles: [
-                `../globalSetup.typescript-assert.ts`,
+                `../../vitest/setup-files/sf-typescript-assert.ts`,
             ],
             sequence: {
                 hooks:      "list",
@@ -68,6 +69,9 @@ export function NEXT_vitestConfigBase_forSpecificTsVersionWorkspace(
                 // enabled: true,
                 // only:    false,
             },
+            env: {
+                [ENV_TS_ALIASED_EXPECTED]: expectedVersion,
+            },
         },
         resolve: {
             alias: {
@@ -75,6 +79,8 @@ export function NEXT_vitestConfigBase_forSpecificTsVersionWorkspace(
             },
         },
     };
+
+    return mergeConfig(config_premade, config_toMerge);
 }
 
 function plugin_typescriptVersionAssert(expectedVersion: ExpectedTsVersionString, getWorkspaceLocalTypescript: () => Promise<ts>): Plugin {

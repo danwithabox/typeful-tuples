@@ -1,0 +1,1 @@
+export const ENV_TS_ALIASED_EXPECTED = `ENV_TS_ALIASED_EXPECTED` as const;
