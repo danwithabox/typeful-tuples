@@ -8,6 +8,7 @@
         "skipLibCheck": true,
         "module": "ESNext",
         "moduleResolution": "Bundler",
+        "target": "ES2017",
         "resolveJsonModule": true,
         "verbatimModuleSyntax": true,
         "strict": true,

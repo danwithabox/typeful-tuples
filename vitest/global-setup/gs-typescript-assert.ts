@@ -6,8 +6,13 @@ import { assertTypescriptVersion } from "../utils/vitest-workspaces-shared";
 export default async function ({ config, provide, }: GlobalSetupContext) {
     const typescriptAliasExpectedVersion = config.env[ENV_TS_ALIASED_EXPECTED];
 
-    assertTypescriptVersion(typescriptAliasExpectedVersion, ts);
+    assertTypescriptVersion({
+        vitestProjectName: config.name,
+        expectedVersion:   typescriptAliasExpectedVersion,
+        aliasedTypescript: ts,
+    });
 
+    provide("vitestProjectName", config.name);
     provide("typescriptAliasExpectedVersion", typescriptAliasExpectedVersion);
 
     return async () => {};
@@ -15,6 +20,7 @@ export default async function ({ config, provide, }: GlobalSetupContext) {
 
 declare module "vitest" {
     export interface ProvidedContext {
+        vitestProjectName:              string,
         typescriptAliasExpectedVersion: string,
     }
 }

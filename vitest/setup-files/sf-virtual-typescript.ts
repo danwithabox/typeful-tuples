@@ -4,19 +4,25 @@ import ts from "typescript";
 import { createVirtualTs, defineVirtualSourceFiles } from "../utils/ts-vfs/ts-vfs";
 
 const _sourceFiles = defineVirtualSourceFiles([
-    { path: `../index.ts`, imports: [`./src/index.js`], },
+    { path: `../index.ts`, imports: [`./src/index`], },
 ]);
 
-
 beforeAll(() => {
-    const typescriptAliasExpectedVersion = inject("typescriptAliasExpectedVersion");
-    expect(typescriptAliasExpectedVersion).toBe(ts.version);
+    { //#region Setting up globals
+        const typescriptAliasExpectedVersion = inject("typescriptAliasExpectedVersion");
+        expect(typescriptAliasExpectedVersion).toBe(ts.version);
 
-    globalThis.sourceFiles = _sourceFiles;
-    globalThis.virtualTs = createVirtualTs({ projectRootPath: join(import.meta.url, `../`), });
+        globalThis.sourceFiles = _sourceFiles;
+        globalThis.virtualTs = createVirtualTs({ projectRootPath: join(import.meta.url, `../../`), });
+    } //#endregion
 
-    console.log("globalThis.sourceFiles", typeof globalThis.sourceFiles);
-    console.log("globalThis.virtualTs", typeof globalThis.virtualTs);
+    { //#region Checking that VFS imports work correctly, to avoid falsely passing tests
+        const { sourceFiles: sf, virtualTs, } = globalThis;
+        const importDiagnostics = virtualTs.tooling.runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+            import { tupleExhaustiveOf } from "${$imports["./src/index"]}";${$l}
+        `);
+        expect(importDiagnostics.queryResult.diagnostics).toEqual([]);
+    } //#endregion
 });
 
 afterAll(() => {
@@ -24,8 +30,6 @@ afterAll(() => {
     delete globalThis.sourceFiles;
     // @ts-expect-error always available from the tests' perspective
     delete globalThis.virtualTs;
-
-    console.log("globals removed");
 });
 
 declare global {

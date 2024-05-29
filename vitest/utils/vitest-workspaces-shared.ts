@@ -4,11 +4,6 @@ import { ENV_TS_ALIASED_EXPECTED } from "../vitest";
 
 type ts = typeof import("typescript");
 
-/**
- * TODO: rework generation
- * - generate typescript version aliases in root workspace
- */
-
 export function vitestConfigWithAliasedTs(
     expectedVersion: string,
     configToMerge?: UserConfig,
@@ -48,34 +43,20 @@ export function vitestConfigWithAliasedTs(
     return mergeConfig(config_premade, config_toMerge);
 }
 
-export async function assertTypescriptVersion(
-    expectedVersion: string,
+export async function assertTypescriptVersion(params: {
+    vitestProjectName: string,
+    expectedVersion:   string,
     aliasedTypescript: ts,
-) {
-    const ts_expectedVersion = expectedVersion;
-    const ts = aliasedTypescript;
-
-    const name = "TypeScript Version Assert";
+}) {
+    const { vitestProjectName, expectedVersion: ts_expectedVersion, aliasedTypescript: ts, } = params;
+    const ts_actualVersion = ts.version;
 
     const msg_typescript = chalk.blueBright(`typescript`);
-
-    console.info(chalk.bold.gray(`${name}`));
-    console.info(chalk.gray     (`Checks whether the Vite-aliased ${msg_typescript} version used by the tests is the expected and correctly pinned version.`));
-    console.info();
-
-    const isAcceptedVersion: boolean = ts_expectedVersion === ts.version;
+    const isAcceptedVersion: boolean = ts_expectedVersion === ts_actualVersion;
     const chalkActual = isAcceptedVersion ? chalk.greenBright : chalk.redBright;
+    const resultIcon = isAcceptedVersion ? `✓` : `✗`;
 
-    const _msg_expected = `${chalk.gray(`Expected `)}${msg_typescript}${chalk.gray (` version: `)}`;
-    const _msg_actual =  `${chalkActual(`  Actual `)}${msg_typescript}${chalkActual(` version: `)}`;
-
-    const msg_expected = `${_msg_expected}${ts_expectedVersion}`;
-    const msg_actual = `${_msg_actual}${ts.version}`;
-
-    console.info(msg_expected);
-    console.info(msg_actual);
-    console.info();
-    console.info(chalkActual(isAcceptedVersion ? `Versions match ✅ ` : `Version mismatch ❌ `));
+    console.info(`|${vitestProjectName}| ${chalk.gray(`asserting [expected, actual] Vite-aliased ${msg_typescript} version:`)} [${ts_expectedVersion}, ${chalkActual(`${ts_actualVersion}`)}] ${chalkActual(resultIcon)}`);
     console.info();
 
     if (!isAcceptedVersion) throw new Error("Test is not using the expected typescript version!");

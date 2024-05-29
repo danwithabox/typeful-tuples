@@ -1,8 +1,6 @@
 import { test } from "vitest";
 import { tuple, tupleOf, tupleUnique } from "../src/index";
 
-// TODO: add expected result types for all demos, make it obvious which result is intended and which is not
-
 test("usability demo for tuple()", () => {
     const values1_correct = tuple([1, 2, 3, 4]);
     const values2_correct = tuple([1, "a", true, ["a", "b"], { a: [false, false], }]);

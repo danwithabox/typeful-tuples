@@ -1,7 +1,8 @@
 import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualTypeScriptEnvironment } from "@typescript/vfs";
 import ts from "typescript";
 import { join } from "desm";
-import type { Simplify, UnionToIntersection } from "type-fest";
+import type { Except, Simplify, UnionToIntersection } from "type-fest";
+import pathe from "pathe";
 
 type VirtualFile_Define = { path: string, imports: string[], };
 type VirtualFile<T extends VirtualFile_Define = VirtualFile_Define> = Simplify<{
@@ -48,31 +49,56 @@ type LnCol = {
  */
 export function createVirtualTs(params: {
     /**
+     * The root path to resolve virtual files from. This affects what should be written in `defineVirtualSourceFiles()`.
+     *
+     * Actual root path will be `./vfs` relative to this path, due to `"@typescript/vfs"` package internals. See JSDoc of `defineVirtualSourceFiles()` for more.
+     *
      * Probably best to use an absolute path via `import.meta.url` with `join` from the `desm` pacakge.
      * ```ts
      * const absoluteProjectRoot = join(import.meta.url, `../../`);
      * ```
     */
-    projectRootPath: string,
+    projectRootPath:           string,
+    /**
+     * To ease the discovery of configuration issues with file paths and imports, pointing `projectRootPath` at a folder containing `package.json` is enforced.
+     *
+     * Sometimes, this enforcement could be unnecessary, set this option to `true` to not check for `package.json`.
+     *
+     * @default false
+     */
+    ignoreMissingPackageJson?: boolean,
 }) {
-    const { projectRootPath, } = params ?? {};
+    const { projectRootPath: _projectRootPath, ignoreMissingPackageJson = false, } = params ?? {};
+    const projectRootPath = pathe.normalize(_projectRootPath);
 
-    const configFileName = ts.findConfigFile(
+    const projectRootPackageJson = pathe.join(projectRootPath, `package.json`);
+    const fileExists_packageJson = ts.sys.fileExists(projectRootPackageJson);
+
+    if (!ignoreMissingPackageJson) {
+        if (!fileExists_packageJson) {
+            throw new Error(
+                `[createVirtualTs] Could not find "package.json" in the provided root path. Please point to a folder with a "package.json" file, or set "ignoreMissingPackageJson" to "true". ` +
+                `Provided path, resolved: "${projectRootPath}"`,
+            );
+        }
+    }
+
+    const tsconfigFilePath = ts.findConfigFile(
         projectRootPath,
         ts.sys.fileExists,
         "tsconfig.json",
     );
-    if (configFileName === void 0) {
+    if (tsconfigFilePath === void 0) {
         throw new Error(
-            `Provided root path does not contain a tsconfig.json file. Please point to a folder with a tsconfig.json file. ` +
-            `Provided path: ${projectRootPath}`,
+            `[createVirtualTs] Could not find a "tsconfig.json" file with "ts.findConfigFile()" starting from the provided root path. Please point to a folder with a discoverable "tsconfig.json" file. ` +
+            `Provided path, resolved: "${projectRootPath}"`,
         );
     }
 
     const compilerOptions = function getCompilerOptions(params: { projectRootPath: string, }): ts.CompilerOptions {
         const { projectRootPath, } = params;
 
-        const configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+        const configFile = ts.readConfigFile(tsconfigFilePath, ts.sys.readFile);
         if (!configFile.config) {
             console.warn(`ts.readConfigFile resulted in unusable config somehow, returning default config`);
             return {};
@@ -250,13 +276,15 @@ export function createVirtualTs(params: {
     })({ vfsEnv: vfs.env, });
 
     return {
+        tsconfigFilePath,
         vfs,
         tooling,
-    };
+    } as const;
 }
 
+await main();
 async function main() {
-    const absoluteProjectRoot = join(import.meta.url, `../../`);
+    const absoluteProjectRoot = join(import.meta.url, `../../../`);
 
     const {
         vfs,
@@ -267,21 +295,6 @@ async function main() {
         projectRootPath: absoluteProjectRoot,
     });
 
-
-    // const source = env.getSourceFile("index.ts")?.fileName;
-    // const source2 = env.getSourceFile("../src/index.ts")?.fileName;
-
-    // console.log("source", source);
-    // console.log("source2", source2);
-    // console.log("completions", completions);
-
-    /**
-     * TODO:
-     *  - if possible: on createVirtualTs() init, compile-check that imports are available
-     *      - util to run code for errors
-     *          - utils: semantic error: code, messageText
-     *  - make sure typescript versions are honored in workspaces
-     */
     // tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);
 
     const sf = defineVirtualSourceFiles([
@@ -331,13 +344,31 @@ async function main() {
 
         console.log("semantics 2", result.queryResult.diagnostics);
     }
-    // TODO: this has a "next" method on its result for some reason
     {
         const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
             import { tupleExhaustiveOf } from "${$imports["./src/index.js"]}";
             tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);${$l}
         `);
 
+        console.log("semantics 3 raw", result.queryResult.diagnosticsRaw);
         console.log("semantics 3", result.queryResult.diagnostics);
+        function* unwrapDiagnosticMessageChain(toUnwrap: ts.DiagnosticMessageChain) {
+            let chain: ts.DiagnosticMessageChain[] = [toUnwrap];
+            while (chain.length) {
+                const _nextChain: ts.DiagnosticMessageChain[] = [];
+                for (const diagnostic of chain) {
+                    _nextChain.push(...(diagnostic.next ?? []));
+                    delete diagnostic.next;
+                    yield diagnostic as Except<ts.DiagnosticMessageChain, "next">;
+                }
+                chain = _nextChain;
+            }
+        }
+        const unwrapped = result.queryResult.diagnosticsRaw.flatMap((diag): Except<ts.DiagnosticMessageChain, "next">[] => {
+            const { messageText, category, code, } = diag;
+            if (typeof messageText === "string") return [{ messageText, category, code, }]; // Not sure if this ever runs, but typing suggests it might
+            else return [...unwrapDiagnosticMessageChain(messageText)];
+        });
+        console.log("unwrapped messageText", unwrapped);
     }
 }
