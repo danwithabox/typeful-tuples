@@ -1,52 +1,6 @@
-import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualTypeScriptEnvironment } from "@typescript/vfs";
-import ts from "typescript";
-import { join } from "desm";
-import type { Except, Simplify, UnionToIntersection } from "type-fest";
 import pathe from "pathe";
+import ts from "typescript";
 
-type VirtualFile_Define = { path: string, imports: string[], };
-type VirtualFile<T extends VirtualFile_Define = VirtualFile_Define> = Simplify<{
-    path:    T["path"],
-    imports: {[K in T["imports"][number]]: K; },
-}>;
-type VirtualFile_Entry<T extends VirtualFile_Define = VirtualFile_Define> = {
-    [K_P in T["path"]]: VirtualFile<T>
-};
-type VirtualFiles_Transform<T extends VirtualFile_Define[]> = Simplify<UnionToIntersection<{
-    [K in keyof T]: VirtualFile_Entry<T[K]>;
-}[number]>>;
-
-/**
- * NOTE: the base path for virtual files is `./vfs`. Therefore, if you want to correctly set up files, it's recommended to do this:
- *
- * ```ts
- * const sf = defineVirtualSourceFiles([
- *     { path: `../index.ts`, imports: [`./src/index.js`], },
- * ]);
- * ```
- */
-export function defineVirtualSourceFiles<const T extends VirtualFile_Define[]>(virtualFiles: T): VirtualFiles_Transform<T> {
-    const mapped = virtualFiles.reduce((acc, curr) => {
-        const { path, imports: _imports, } = curr;
-        const imports = _imports.reduce((acc, curr) => ({ ...acc, [curr]: curr, }), {} as VirtualFile["imports"]);
-        const entry: VirtualFile = { path, imports, };
-        return { ...acc, [entry.path]: entry, };
-    }, {} as VirtualFile_Entry);
-    return mapped as VirtualFiles_Transform<T>;
-}
-
-type LnCol = {
-    /** 1-based, just like in the status bar of Visual Studio Code */
-    Ln:  number,
-    /** 1-based, just like in the status bar of Visual Studio Code */
-    Col: number,
-};
-
-/**
- * Loosely based on:
- * - https://github.com/microsoft/TypeScript/issues/32916
- * - https://github.com/yunabe/tsapi-completions/blob/master/src/completions.spec.ts
- */
 export function createVirtualTs(params: {
     /**
      * The root path to resolve virtual files from. This affects what should be written in `defineVirtualSourceFiles()`.
@@ -111,17 +65,12 @@ export function createVirtualTs(params: {
         return compilerOptions;
     }({ projectRootPath, });
 
-    const { vfs, } = (() => {
+    const { host, } = (() => {
         const fsFileMap = new Map<string, string>();
-        const system = createFSBackedSystem(fsFileMap, projectRootPath, ts);
-        const rootFiles: string[] = [];
-        const env = createVirtualTypeScriptEnvironment(system, rootFiles, ts, compilerOptions);
+        const host = ts.createCompilerHost(compilerOptions);
+        // host.getSourceFile("", { languageVersion: ts.ScriptTarget.ES2017, });
 
-        const vfs = {
-            fsFileMap,
-            env,
-        };
-        return { vfs, };
+        return { host, };
     })();
 
     const { tooling, } = (function createTooling(params: { vfsEnv: VirtualTypeScriptEnvironment, }) {
@@ -280,95 +229,4 @@ export function createVirtualTs(params: {
         vfs,
         tooling,
     } as const;
-}
-
-// await main();
-async function main() {
-    const absoluteProjectRoot = join(import.meta.url, `../../../`);
-
-    const {
-        vfs,
-        tooling: {
-            runQueryOnVirtualFile,
-        },
-    } = createVirtualTs({
-        projectRootPath: absoluteProjectRoot,
-    });
-
-    // tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);
-
-    const sf = defineVirtualSourceFiles([
-        { path: `../index.ts`, imports: [`./src/index.js`], },
-        // { path: `../index2.ts`, imports: [`./src/index2.js`, `..src/index3.js`], },
-    ]);
-
-    {
-        const result = runQueryOnVirtualFile.getCompletionsAtPosition(sf["../index.ts"], ({ $c, $imports, }) => /* ts */`
-            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
-            tupleUniqueOf<"foo" | "bar">()(["foo", "${$c}"]);
-        `);
-
-        console.log(result.queryResult.entriesNames);
-    }
-    {
-        const result = runQueryOnVirtualFile.getCompletionsAtPosition(sf["../index.ts"], ({ $c, $imports, }) => /* ts */`
-            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
-            tupleUniqueOf<"foo" | "bar">()(["bar", "${$c}"]);
-            tupleUniqueOf<"foo" | "bar">()(["bar", {
-
-            }]);
-        `);
-
-        console.log(result.queryResult.entriesNames);
-    }
-
-    {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
-        import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
-            tupleUniqueOf<"foo" | "bar">()(["bxar", {}]);${$l}
-            tupleUniqueOf<"foo" | "bar">()(["bar",{
-
-            }]);
-        `);
-
-        console.log("semantics 1", result.queryResult.diagnostics);
-    }
-    {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
-            import { tupleUniqueOf } from "${$imports["./src/index.js"]}";
-            tupleUniqueOf<"foo" | "bar">()(["bar", ""]);
-            tupleUniqueOf<"foo" | "bar">()(["bar", {
-                ${$l}
-            }]);
-        `);
-
-        console.log("semantics 2", result.queryResult.diagnostics);
-    }
-    {
-        const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
-            import { tupleExhaustiveOf } from "${$imports["./src/index.js"]}";
-            tupleExhaustiveOf<"foo" | "bar" | "asd">()(["foo", "asd"]);${$l}
-        `);
-
-        console.log("semantics 3 raw", result.queryResult.diagnosticsRaw);
-        console.log("semantics 3", result.queryResult.diagnostics);
-        function* unwrapDiagnosticMessageChain(toUnwrap: ts.DiagnosticMessageChain) {
-            let chain: ts.DiagnosticMessageChain[] = [toUnwrap];
-            while (chain.length) {
-                const _nextChain: ts.DiagnosticMessageChain[] = [];
-                for (const diagnostic of chain) {
-                    _nextChain.push(...(diagnostic.next ?? []));
-                    delete diagnostic.next;
-                    yield diagnostic as Except<ts.DiagnosticMessageChain, "next">;
-                }
-                chain = _nextChain;
-            }
-        }
-        const unwrapped = result.queryResult.diagnosticsRaw.flatMap((diag): Except<ts.DiagnosticMessageChain, "next">[] => {
-            const { messageText, category, code, } = diag;
-            if (typeof messageText === "string") return [{ messageText, category, code, }]; // Not sure if this ever runs, but typing suggests it might
-            else return [...unwrapDiagnosticMessageChain(messageText)];
-        });
-        console.log("unwrapped messageText", unwrapped);
-    }
 }
