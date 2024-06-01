@@ -1,39 +1,9 @@
 import { createFSBackedSystem, createVirtualTypeScriptEnvironment, type VirtualTypeScriptEnvironment } from "@typescript/vfs";
 import ts from "typescript";
 import { join } from "desm";
-import type { Except, Simplify, UnionToIntersection } from "type-fest";
+import type { Except } from "type-fest";
 import pathe from "pathe";
-
-type VirtualFile_Define = { path: string, imports: string[], };
-type VirtualFile<T extends VirtualFile_Define = VirtualFile_Define> = Simplify<{
-    path:    T["path"],
-    imports: {[K in T["imports"][number]]: K; },
-}>;
-type VirtualFile_Entry<T extends VirtualFile_Define = VirtualFile_Define> = {
-    [K_P in T["path"]]: VirtualFile<T>
-};
-type VirtualFiles_Transform<T extends VirtualFile_Define[]> = Simplify<UnionToIntersection<{
-    [K in keyof T]: VirtualFile_Entry<T[K]>;
-}[number]>>;
-
-/**
- * NOTE: the base path for virtual files is `./vfs`. Therefore, if you want to correctly set up files, it's recommended to do this:
- *
- * ```ts
- * const sf = defineVirtualSourceFiles([
- *     { path: `../index.ts`, imports: [`./src/index.js`], },
- * ]);
- * ```
- */
-export function defineVirtualSourceFiles<const T extends VirtualFile_Define[]>(virtualFiles: T): VirtualFiles_Transform<T> {
-    const mapped = virtualFiles.reduce((acc, curr) => {
-        const { path, imports: _imports, } = curr;
-        const imports = _imports.reduce((acc, curr) => ({ ...acc, [curr]: curr, }), {} as VirtualFile["imports"]);
-        const entry: VirtualFile = { path, imports, };
-        return { ...acc, [entry.path]: entry, };
-    }, {} as VirtualFile_Entry);
-    return mapped as VirtualFiles_Transform<T>;
-}
+import { defineVirtualSourceFiles, type VirtualFile } from "./virtualized-files";
 
 type LnCol = {
     /** 1-based, just like in the status bar of Visual Studio Code */
@@ -100,7 +70,7 @@ export function createVirtualTs(params: {
 
         const configFile = ts.readConfigFile(tsconfigFilePath, ts.sys.readFile);
         if (!configFile.config) {
-            console.warn(`ts.readConfigFile resulted in unusable config somehow, returning default config`);
+            console.warn(`[createVirtualTs] ts.readConfigFile resulted in unusable config somehow, returning default config`);
             return {};
         }
         const compilerOptions = ts.parseJsonConfigFileContent(
@@ -123,6 +93,10 @@ export function createVirtualTs(params: {
         };
         return { vfs, };
     })();
+
+    const program = vfs.env.languageService.getProgram() ?? void 0;
+    if (program === void 0) throw new Error(`[createVirtualTs] getProgram() somehow returned undefined.`);
+    const typeChecker = program.getTypeChecker();
 
     const { tooling, } = (function createTooling(params: { vfsEnv: VirtualTypeScriptEnvironment, }) {
         const { vfsEnv, } = params;
@@ -276,8 +250,14 @@ export function createVirtualTs(params: {
     })({ vfsEnv: vfs.env, });
 
     return {
-        tsconfigFilePath,
+        ts,
+        tsconfig: {
+            tsconfigFilePath,
+            compilerOptions,
+        },
         vfs,
+        program,
+        typeChecker,
         tooling,
     } as const;
 }

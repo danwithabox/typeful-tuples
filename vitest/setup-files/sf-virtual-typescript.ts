@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, expect, inject } from "vitest";
 import { join } from "desm";
 import ts from "typescript";
-import { createVirtualTs, defineVirtualSourceFiles } from "../utils/ts-vfs/ts-vfs";
+import { createVirtualTs } from "../utils/ts-vfs/ts-vfs";
+import { defineVirtualSourceFiles } from "../utils/ts-vfs/virtualized-files";
 
 const _sourceFiles = defineVirtualSourceFiles([
     { path: `../index.ts`, imports: [`./src/index`], },
