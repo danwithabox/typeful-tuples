@@ -21,58 +21,71 @@ const transformRecipe: TransformRecipe_AliasedTsVersions = {
     update: [{ from: "5.5.0-beta", to: "5.6.1-beta", }],
 };
 
-await async function main() {
-    const tsTool = createTs({
-        projectRootPath: join(import.meta.url, `../../`),
-    });
+const tsTool = createTs({
+    projectRootPath: join(import.meta.url, `../../`),
+});
 
-    const filePath = `./dummy-vitest.workspace.ts`;
+const filePath = `./dummy-vitest.workspace.ts`;
 
-    function makeAdaptedSourceFile(filePath: string) {
-        const MARKER_tsEmptyLine = `// @ts-empty-line`;
+function makeAdaptedSourceFile(filePath: string) {
+    const MARKER_tsEmptyLine = `// @ts-empty-line`;
 
-        const file = tsTool.host.readFile(filePath);
-        if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
+    const file = tsTool.host.readFile(filePath);
+    if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
 
-        const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
-        const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
+    const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
+    const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
 
-        const sourceFile = ts.createSourceFile(
-            filePath,
-            encodedEmptyLines,
-            tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
-        );
-        const decodeEmptyLines = (sourceFileText: string): string => {
-            const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
-            const decoded_CLRF = decoded.join(EOL);
-            return decoded_CLRF;
-        };
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        encodedEmptyLines,
+        tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
+    );
+    const decodeEmptyLines = (sourceFileText: string): string => {
+        const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
+        const decoded_CLRF = decoded.join(EOL);
+        return decoded_CLRF;
+    };
 
-        return {
-            sourceFile,
-            decodeEmptyLines,
-        };
+    return {
+        sourceFile,
+        decodeEmptyLines,
+    };
+}
+
+const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(filePath);
+
+const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
+    if (ts.isExportAssignment(node)) return node;
+});
+const nodeOf_Identifier_defineWorkspace = walkMaybeToNodeOf(node => {
+    const correctName = CORRECT_IDENTIFIERS.defineWorkspace;
+
+    if (ts.isCallExpression(node)) {
+        if (ts.isIdentifier(node.expression)) {
+            if (node.expression.escapedText === correctName) return node;
+        }
     }
+});
+const nodeOf_ArrayLiteralExpression = walkMaybeToNodeOf(node => {
+    if (ts.isArrayLiteralExpression(node)) return node;
+});
 
-    const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(filePath);
+export function astOperation_parseVersions(): string[] {
+    const node1 = nodeOf_ExportAssignment(sourceFile);
+    const node2 = nodeOf_Identifier_defineWorkspace(node1);
+    const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2);
 
+    if (node_workspaceArray === void 0) throw new Error(`Couldn't find a default-exported "${CORRECT_IDENTIFIERS.defineWorkspace}()"'s array in the source file.`);
+
+    const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
+
+    const parsedVersions = versions.map(_ => _.textOfVersion);
+    return parsedVersions;
+}
+
+await async function main() {
     const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => (rootNode) => {
-        const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
-            if (ts.isExportAssignment(node)) return node;
-        });
-        const nodeOf_Identifier_defineWorkspace = walkMaybeToNodeOf(node => {
-            const correctName = CORRECT_IDENTIFIERS.defineWorkspace;
-
-            if (ts.isCallExpression(node)) {
-                if (ts.isIdentifier(node.expression)) {
-                    if (node.expression.escapedText === correctName) return node;
-                }
-            }
-        });
-        const nodeOf_ArrayLiteralExpression = walkMaybeToNodeOf(node => {
-            if (ts.isArrayLiteralExpression(node)) return node;
-        });
-
         const node1 = nodeOf_ExportAssignment(rootNode, context);
         const node2 = nodeOf_Identifier_defineWorkspace(node1, context);
         const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2, context);
@@ -106,11 +119,11 @@ await async function main() {
     const [{ output: linted, }] = await eslint.lintText(source_decoded);
 
     if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
-    tsTool.host.writeFile(filePath, linted, false);
+    // tsTool.host.writeFile(filePath, linted, false);
 }();
 
 /** Should be executed in the order of remove, add, update */
-type TransformRecipe_AliasedTsVersions = {
+export type TransformRecipe_AliasedTsVersions = {
     add:    string[],
     remove: string[],
     update: { from: string, to: string, }[],
@@ -128,7 +141,7 @@ function transformWalkResultWithRecipe(
     const _walkResult = [...walkResult];
     const { add: _r_add, remove: _r_remove, update: _r_update, } = transformRecipe;
 
-    const findExistent = (version: string): { found: WalkResult_VersionAndNode, index: number, } | { found: undefined, } => {
+    const findExistentVersionEntry = (version: string): { found: WalkResult_VersionAndNode, index: number, } | { found: undefined, } => {
         const index = _walkResult.findIndex(result => result.textOfVersion === version);
         const found = _walkResult[index] as (typeof _walkResult[number]) | undefined;
         if (found === void 0) return { found, };
@@ -136,7 +149,7 @@ function transformWalkResultWithRecipe(
     };
 
     for (const version of _r_remove) {
-        const checked = findExistent(version);
+        const checked = findExistentVersionEntry(version);
         if (!checked.found) {
             console.warn(`Skipped removing specified version "${version}": version does not exist in vitest.workspace.ts`);
             continue;
@@ -144,7 +157,7 @@ function transformWalkResultWithRecipe(
         _walkResult.splice(checked.index, 1);
     }
     for (const version of _r_add) {
-        const checked = findExistent(version);
+        const checked = findExistentVersionEntry(version);
         if (checked.found) {
             console.warn(`Skipped adding specified version "${version}": version already exists in vitest.workspace.ts`);
             continue;
@@ -153,7 +166,7 @@ function transformWalkResultWithRecipe(
         _walkResult.push(created);
     }
     for (const { from: version, to: to_version, } of _r_update) {
-        const checked = findExistent(version);
+        const checked = findExistentVersionEntry(version);
         if (!checked.found) {
             console.warn(`Skipped updating specified version "${version}": version does not exist in vitest.workspace.ts`);
             continue;

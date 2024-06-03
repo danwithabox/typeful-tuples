@@ -3,13 +3,14 @@
 import pkg from "../../package.json";
 import { dirname, filename, join } from "desm";
 import fs from "fs-extra";
-import Handlebars from "handlebars";
 import { globSync } from "glob";
 import { program } from "@commander-js/extra-typings";
 import { execa } from "execa";
-import ora from "ora";
+import ora, { type Ora } from "ora";
 import editorconfig from "editorconfig";
 import type { Promisable } from "type-fest";
+import * as inquirer from "@inquirer/prompts";
+import { astOperation_parseVersions, type TransformRecipe_AliasedTsVersions } from "./vitest-alias-update";
 
 const __dirname = dirname(import.meta.url);
 const __filename = filename(import.meta.url);
@@ -18,42 +19,7 @@ const __join = (...str: string[]) => join(import.meta.url, ...str);
 const PATH_DIR_TEMP = `./gen-vitest-temp/` as const;
 const PATH_DIR_ROOT = `../../` as const;
 const PATH_FILE_PACKAGE_JSON = `package.json` as const;
-const PATH_FILE_CODE_WORKSPACE = `typeful-tuples.code-workspace` as const;
-const PATH_DIR_WORKSPACE = `workspaces/` as const;
-const PATH_DIR_WORKSPACE_VITEST_TS_VERSION = (version: string) => `${PATH_DIR_WORKSPACE}vitest-ts-${version}/` as const;
-const PATH_FILE_WORKSPACE_PACKAGE_JSON = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}package.json` as const;
-const PATH_FILE_WORKSPACE_VITEST_CONFIG_TS = (version: string) => `${PATH_DIR_WORKSPACE_VITEST_TS_VERSION(version)}vitest.config.ts` as const;
-
-const TEMPLATE_LOAD = (templateDirRelativePath: string) => Handlebars.compile(fs.readFileSync(__join("./templates/", templateDirRelativePath), "utf-8"));
-const TEMPLATES = {
-    "workspace__package.json.hbs":     TEMPLATE_LOAD("workspace__package.json.hbs"),
-    "workspace__vitest.config.ts.hbs": TEMPLATE_LOAD("workspace__vitest.config.ts.hbs"),
-};
-
-/** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
-function safeRmdir() {
-    /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
-    const globAtTempDirToAbsolute = (pattern: string | string[]) => globSync(pattern, { cwd: __join(PATH_DIR_TEMP), })
-        .map((globPath) => __join(PATH_DIR_TEMP, globPath))
-    ;
-    try {
-        const globs = [
-            PATH_FILE_PACKAGE_JSON,
-            PATH_FILE_CODE_WORKSPACE,
-            PATH_DIR_WORKSPACE,
-            PATH_DIR_WORKSPACE_VITEST_TS_VERSION("*"),
-            PATH_FILE_WORKSPACE_PACKAGE_JSON("*"),
-            PATH_FILE_WORKSPACE_VITEST_CONFIG_TS("*"),
-        ];
-        const pathsToRemove = globAtTempDirToAbsolute(globs).sort((a, b) => b.length - a.length);
-
-        for (const path of pathsToRemove) fs.statSync(path).isDirectory() ? fs.rmdirSync(path) : fs.rmSync(path);
-
-        if (fs.existsSync(__join(PATH_DIR_TEMP))) fs.rmdirSync(__join(PATH_DIR_TEMP));
-    } catch (error) {
-        throw error;
-    }
-}
+const PATH_FILE_VITEST_WORKSPACE_TS = `vitest.workspace.ts` as const;
 
 /**
  * TODO: rework generation
@@ -77,47 +43,64 @@ await async function main() {
         .name("npx gen-vitest")
         .description(`Generates a workspace to run Vitest with the given pinned version of typescript.`)
         .showHelpAfterError()
-        .requiredOption(`-ts, --ts-version <value>`, `The pinned typescript version to use with the Vitest workspace.`)
+        .option(`-ts, --ts-version <value>`, `The pinned typescript version to use with the Vitest workspace.`)
         .option(`--keep-temp`, `Keep the "${PATH_DIR_TEMP}" folder (on error AND success). Default: false.`)
         .parse()
         .opts()
     ;
 
     const { tsVersion, keepTemp = false, } = params;
-    const { devDependencies: { vitest: vitestVersionFromWorkspaceLatest, }, } = (await import("../../workspaces/vitest-ts-latest/package.json")).default;
 
     const spinner = ora();
+    const { asyncOperation, } = useAsyncOperation(spinner);
 
-    async function asyncOperation<R>(
-        text: string,
-        operationFn: (messageFns: {
-            succeed: (message?: string) => void,
-            fail:    (message: string | ((text: string) => string)) => void,
-            pause:   () => void,
-            resume:  () => void,
-        }) => Promisable<R>,
-    ) {
-        spinner.start(text);
-        const result = await operationFn({
-            succeed(message) {
-                const _message: string = message ?? text;
-                spinner.succeed(_message);
-            },
-            fail(message) {
-                const _message: string = typeof message === "function" ? message(text) : message;
-                spinner.fail(_message);
-                throw new Error(_message);
-            },
-            pause() {
-                spinner.stopAndPersist();
-            },
-            resume() {
-                spinner.start(text);
-            },
-        });
-        spinner.stop();
-        return result;
-    }
+    const Inquirer_Selection_Operations_Choices = [`add`, `remove`, `update`] as const;
+    type Inquirer_Selection_Operations_Choices = (typeof Inquirer_Selection_Operations_Choices)[number];
+
+    const Inquirer_Selection_Menu_Choices = [`exit`, `run`] as const;
+    type Inquirer_Selection_Menu_Choices = (typeof Inquirer_Selection_Menu_Choices)[number];
+
+    const recipeCache: TransformRecipe_AliasedTsVersions = {
+        remove: [],
+        add:    [],
+        update: [],
+    };
+
+    const message_listVersions = () => astOperation_parseVersions().map(_ => `- "${_}"`).join(`\n`);
+    console.info("Parsed versions in vitest.workspace.ts:");
+    console.info(message_listVersions());
+    /**
+     * TODO:
+     *  - header data showing recipe
+     *  - while loop for adding until run or exit
+     *  - remove recipe options menu with checkbox
+     *  - "run" option disabled when recipe is empty
+     *  - implement all options
+     */
+    console.info();
+    const inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
+        message: `Choose an action:`,
+        choices: [
+            { value: `add`, },
+            { value: `remove`, },
+            { value: `update`, },
+            { value: `run`, disabled: true, },
+            { value: `exit`, },
+        ] as const,
+        default: "exit",
+    });
+
+    const inq_input_version = await inquirer.input({
+        message: "Specify a version to add:",
+        async validate(tsVersion) {
+            const tsVersion_isAvailableOnNpm = await execa(`npm view typescript@${tsVersion}`)
+                .then(() => true as const)
+                .catch(err => err instanceof Error ? err.message : String(err))
+            ;
+
+            return tsVersion_isAvailableOnNpm;
+        },
+    });
 
     try {
         await asyncOperation(`Checking if typescript@${tsVersion} is available`, async ({ succeed, fail, }) => {
@@ -286,3 +269,61 @@ await async function main() {
 
 
 }();
+
+/** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
+function safeRmdir() {
+    /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
+    const globAtTempDirToAbsolute = (pattern: string | string[]) => globSync(pattern, { cwd: __join(PATH_DIR_TEMP), })
+        .map((globPath) => __join(PATH_DIR_TEMP, globPath))
+    ;
+    try {
+        const globs = [
+            PATH_FILE_PACKAGE_JSON,
+            PATH_FILE_VITEST_WORKSPACE_TS,
+        ];
+        const pathsToRemove = globAtTempDirToAbsolute(globs).sort((a, b) => b.length - a.length);
+
+        for (const path of pathsToRemove) fs.statSync(path).isDirectory() ? fs.rmdirSync(path) : fs.rmSync(path);
+
+        if (fs.existsSync(__join(PATH_DIR_TEMP))) fs.rmdirSync(__join(PATH_DIR_TEMP));
+    } catch (error) {
+        throw error;
+    }
+}
+
+function useAsyncOperation(ora: Ora) {
+    async function asyncOperation<R>(
+        text: string,
+        operationFn: (messageFns: {
+            succeed: (message?: string) => void,
+            fail:    (message: string | ((text: string) => string)) => void,
+            pause:   () => void,
+            resume:  () => void,
+        }) => Promisable<R>,
+    ) {
+        ora.start(text);
+        const result = await operationFn({
+            succeed(message) {
+                const _message: string = message ?? text;
+                ora.succeed(_message);
+            },
+            fail(message) {
+                const _message: string = typeof message === "function" ? message(text) : message;
+                ora.fail(_message);
+                throw new Error(_message);
+            },
+            pause() {
+                ora.stopAndPersist();
+            },
+            resume() {
+                ora.start(text);
+            },
+        });
+        ora.stop();
+        return result;
+    }
+
+    return {
+        asyncOperation,
+    };
+}
