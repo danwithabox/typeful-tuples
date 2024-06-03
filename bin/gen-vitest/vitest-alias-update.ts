@@ -1,76 +1,67 @@
 import { join } from "desm";
 import { createTs } from "../../vitest/utils/ts-vfs/ts-fs";
 import ts from "typescript";
+import { walkMaybeToNodeOf, walkTransform } from "../../vitest/utils/ts-vfs/walk";
+import { ESLint } from "eslint";
+import { EOL } from "node:os";
+
+/**
+ * TODO:
+ *  - more robust matching, such as handling rename of identifiers
+ *      - blocked by the type-checker throwing errors around "flags", similar to this: https://github.com/microsoft/TypeScript/issues/58371
+ */
+const CORRECT_IDENTIFIERS = {
+    "defineWorkspace":           "defineWorkspace",
+    "vitestConfigWithAliasedTs": "vitestConfigWithAliasedTs",
+} as const;
+
+const transformRecipe: TransformRecipe_AliasedTsVersions = {
+    add:    ["5.4.4"],
+    remove: ["5.4.5"],
+    update: [{ from: "5.5.0-beta", to: "5.6.1-beta", }],
+};
 
 await async function main() {
     const tsTool = createTs({
         projectRootPath: join(import.meta.url, `../../`),
     });
 
-    const sourceFile = tsTool.host.getSourceFile(`./dummy-vitest.workspace.ts`, tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext);
-    if (!sourceFile) throw new Error("getSourceFile() did not find the target file");
+    const filePath = `./dummy-vitest.workspace.ts`;
 
-    function walkTransform<T extends ts.Node>(
-        rootNode: ts.Node,
-        context: ts.TransformationContext | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-        visitorCb: (node: ts.Node, abort: AbortController["abort"]) => (void | ts.VisitResult<ts.Node>),
-    ): T {
-        const ac = new AbortController();
+    function makeAdaptedSourceFile(filePath: string) {
+        const MARKER_tsEmptyLine = `// @ts-empty-line`;
 
-        const visitor: ts.Visitor = (node) => {
-            if (ac.signal.aborted) return node;
+        const file = tsTool.host.readFile(filePath);
+        if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
 
-            const visitorResult = visitorCb(
-                node,
-                // Deliberately written out, because `.abort` is not bound to the `this` context
-                (reason?: any) => ac.abort(reason),
-            );
-            if (visitorResult !== void 0) return visitorResult;
+        const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
+        const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
 
-            return ts.visitEachChild(node, visitor, context);
+        const sourceFile = ts.createSourceFile(
+            filePath,
+            encodedEmptyLines,
+            tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
+        );
+        const decodeEmptyLines = (sourceFileText: string): string => {
+            const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
+            const decoded_CLRF = decoded.join(EOL);
+            return decoded_CLRF;
         };
-        return ts.visitNode(rootNode, visitor) as T;
+
+        return {
+            sourceFile,
+            decodeEmptyLines,
+        };
     }
 
-    function walkFind<T extends ts.Node>(
-        rootNode: ts.Node,
-        context: ts.TransformationContext | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-        visitorCb: (node: ts.Node, abort: AbortController["abort"]) => (T | undefined | void),
-    ): T | undefined {
-        let found: T | undefined;
-        const ac = new AbortController();
-
-        const visitor: ts.Visitor = (node) => {
-            if (ac.signal.aborted) return node;
-
-            const visitorResult = visitorCb(
-                node,
-                // Deliberately written out, because `.abort` is not bound to the `this` context
-                (reason?: any) => ac.abort(reason),
-            );
-            if (visitorResult !== void 0) {
-                found = visitorResult;
-                ac.abort();
-            }
-
-            return ts.visitEachChild(node, visitor, context);
-        };
-        ts.visitNode(rootNode, visitor) as ts.Node;
-        return found;
-    }
+    const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(filePath);
 
     const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => (rootNode) => {
-        const nodeOf = <T extends ts.Node>(walkFindFn: Parameters<typeof walkFind<T>>[2]) => {
-            return (nodeStart?: ts.Node) => (nodeStart !== void 0) ? walkFind<T>(nodeStart, context, walkFindFn) : void 0;
-        };
-
-        const nodeOf_ExportAssignment = nodeOf(node => {
+        const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
             if (ts.isExportAssignment(node)) return node;
         });
-        const nodeOf_Identifier_defineWorkspace = nodeOf(node => {
-            const correctName = `defineWorkspace`;
+        const nodeOf_Identifier_defineWorkspace = walkMaybeToNodeOf(node => {
+            const correctName = CORRECT_IDENTIFIERS.defineWorkspace;
 
             if (ts.isCallExpression(node)) {
                 if (ts.isIdentifier(node.expression)) {
@@ -78,24 +69,25 @@ await async function main() {
                 }
             }
         });
-        const nodeOfArrayLiteralExpression = nodeOf(node => {
+        const nodeOf_ArrayLiteralExpression = walkMaybeToNodeOf(node => {
             if (ts.isArrayLiteralExpression(node)) return node;
         });
 
-        const node1 = nodeOf_ExportAssignment(rootNode);
-        const node2 = nodeOf_Identifier_defineWorkspace(node1);
-        const node3 = nodeOfArrayLiteralExpression(node2);
+        const node1 = nodeOf_ExportAssignment(rootNode, context);
+        const node2 = nodeOf_Identifier_defineWorkspace(node1, context);
+        const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2, context);
 
-        if (node3 === void 0) throw new Error(`Couldn't find "defineWorkspace()"'s array in the source file.`);
+        if (node_workspaceArray === void 0) throw new Error(`Couldn't find a default-exported "${CORRECT_IDENTIFIERS.defineWorkspace}()"'s array in the source file.`);
 
         return walkTransform(rootNode, context, (node, abort) => {
-            if (node === node3) {
-                /**
-                 * TODO:
-                 * - process node3 to get versions
-                 * - take Transform_AliasedTsVersions and apply it based on processed versions
-                 */
-                return factory_array();
+            if (node === node_workspaceArray) {
+                const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
+                const transformed = transformWalkResultWithRecipe(versions, transformRecipe);
+                const elements = transformed.map(_ => _.cloneNodeOfArrayElement);
+
+                return ts.factory.updateArrayLiteralExpression(node_workspaceArray,
+                    elements,
+                );
             }
         });
     };
@@ -108,48 +100,125 @@ await async function main() {
     const printer = ts.createPrinter();
 
     const source_new = printer.printFile(transformationResult.transformed[0]);
-    console.log("transformed?", source_new);
+    const source_decoded = decodeEmptyLines(source_new);
+
+    const eslint = new ESLint({ fix: true, });
+    const [{ output: linted, }] = await eslint.lintText(source_decoded);
+
+    if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
+    tsTool.host.writeFile(filePath, linted, false);
 }();
 
-type Transform_AliasedTsVersions = {
+/** Should be executed in the order of remove, add, update */
+type TransformRecipe_AliasedTsVersions = {
     add:    string[],
     remove: string[],
     update: { from: string, to: string, }[],
 };
 
-function factory_array() {
-    const { factory, } = ts;
+type WalkResult_VersionAndNode = {
+    textOfVersion:           string,
+    cloneNodeOfArrayElement: ts.CallExpression,
+};
 
-    return factory.createArrayLiteralExpression(
-        [
-            factory.createCallExpression(
-                factory.createIdentifier("vitestConfigWithAliasedTs"),
+function transformWalkResultWithRecipe(
+    walkResult: WalkResult_VersionAndNode[],
+    transformRecipe: TransformRecipe_AliasedTsVersions,
+): WalkResult_VersionAndNode[] {
+    const _walkResult = [...walkResult];
+    const { add: _r_add, remove: _r_remove, update: _r_update, } = transformRecipe;
+
+    const findExistent = (version: string): { found: WalkResult_VersionAndNode, index: number, } | { found: undefined, } => {
+        const index = _walkResult.findIndex(result => result.textOfVersion === version);
+        const found = _walkResult[index] as (typeof _walkResult[number]) | undefined;
+        if (found === void 0) return { found, };
+        return { found, index, };
+    };
+
+    for (const version of _r_remove) {
+        const checked = findExistent(version);
+        if (!checked.found) {
+            console.warn(`Skipped removing specified version "${version}": version does not exist in vitest.workspace.ts`);
+            continue;
+        }
+        _walkResult.splice(checked.index, 1);
+    }
+    for (const version of _r_add) {
+        const checked = findExistent(version);
+        if (checked.found) {
+            console.warn(`Skipped adding specified version "${version}": version already exists in vitest.workspace.ts`);
+            continue;
+        }
+        const created = create_vitestConfigWithAliasedTs(version);
+        _walkResult.push(created);
+    }
+    for (const { from: version, to: to_version, } of _r_update) {
+        const checked = findExistent(version);
+        if (!checked.found) {
+            console.warn(`Skipped updating specified version "${version}": version does not exist in vitest.workspace.ts`);
+            continue;
+        }
+        const created = create_vitestConfigWithAliasedTs(to_version, checked.found.cloneNodeOfArrayElement);
+        _walkResult.splice(checked.index, 1, created);
+    }
+
+    const sorted = _walkResult.sort((a, b) => b.textOfVersion.toLocaleLowerCase().localeCompare(a.textOfVersion.toLocaleLowerCase()));
+
+    return sorted;
+}
+
+function interpretAst_workspaceArray_versions(node_array: ts.ArrayLiteralExpression): WalkResult_VersionAndNode[] {
+    const matchValidExpressionText = (expression: ts.Expression) => {
+        switch (true) {
+            case ts.isStringLiteral(expression): return expression.text;
+            case ts.isNoSubstitutionTemplateLiteral(expression): return expression.text;
+            case ts.isTemplateExpression(expression):
+            default: return;
+        }
+    };
+    const versions = node_array.elements.flatMap((element) => {
+        if (ts.isCallExpression(element)) {
+            if ((ts.isIdentifier(element.expression)) && (element.expression.escapedText === CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs)) {
+                const [arg_versionExpression, ...arg_rest] = element.arguments;
+                const text = matchValidExpressionText(arg_versionExpression);
+                if (text === void 0) throw new Error(
+                    "Invalid string expression in place of version string, please only use string literals and no-substitution template literals " +
+                    `for the parameter of "${CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs}"`,
+                );
+                const cloneNodeOfArrayElement = ts.factory.updateCallExpression(element, element.expression, void 0, element.arguments);
+                return [{ textOfVersion: text, cloneNodeOfArrayElement, }];
+            }
+        }
+        return [];
+    });
+    return versions;
+}
+
+function create_vitestConfigWithAliasedTs(
+    version: string,
+    toUpdate?: WalkResult_VersionAndNode["cloneNodeOfArrayElement"],
+): WalkResult_VersionAndNode {
+    const { factory, } = ts;
+    const cloneNodeOfArrayElement = (() => {
+        if (toUpdate === void 0) {
+            return factory.createCallExpression(
+                factory.createIdentifier(CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs),
                 void 0,
                 [
-                   factory.createStringLiteral("5.4.5"),
+                    factory.createStringLiteral(version),
                 ],
-            ),
-            // factory.createCallExpression(
-            //     factory.createIdentifier("vitestConfigWithAliasedTs"),
-            //     void 0,
-            //     [
-            //         factory.createNoSubstitutionTemplateLiteral(
-            //             "5.5.0-beta",
-            //             "5.5.0-beta",
-            //         ),
-            //         factory.createObjectLiteralExpression(
-            //             [factory.createPropertyAssignment(
-            //                 factory.createIdentifier("test"),
-            //                 factory.createObjectLiteralExpression(
-            //                     [],
-            //                     true,
-            //                 ),
-            //             )],
-            //             true,
-            //         ),
-            //     ],
-            // ),
-        ],
-        true,
-    );
+            );
+        } else {
+            const [version_old, ...rest_argumentsArray] = toUpdate.arguments;
+            return factory.updateCallExpression(toUpdate,
+                toUpdate.expression,
+                toUpdate.typeArguments,
+                [
+                    factory.createStringLiteral(version),
+                    ...rest_argumentsArray,
+                ],
+            );
+        }
+    })();
+    return { textOfVersion: version, cloneNodeOfArrayElement, };
 }

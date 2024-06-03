@@ -57,11 +57,19 @@ function safeRmdir() {
 
 /**
  * TODO: rework generation
+ * ! deferring bigger ideas until experience with github actions, for now only allow easy scaffolding and removal
+ *
  * - vitest.workspace.ts
  *      - AST check to find existing entries
  *      - AST transform to add new entry
  * - package.json
  *      - npm install typescript alias
+ *
+ *  npm
+ *      tags
+ *          latest
+ *          beta
+ *          next
  */
 
 await async function main() {

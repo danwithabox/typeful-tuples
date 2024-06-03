@@ -91,6 +91,7 @@ await async function main() {
                     const _node = node as ts.Identifier;
                     console.log("_node", _node.escapedText);
                     // const sym = __virtualTs.typeChecker.getSymbolAtLocation(_node);
+                    // TODO: minimal repro of this breaking, maybe using this as the basis for the minimal code: https://github.com/microsoft/TypeScript/issues/50204
                     const sym = virtualizedTs.typeChecker.getSymbolAtLocation(_node);
                     break;
                 }
