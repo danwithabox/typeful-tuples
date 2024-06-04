@@ -3,6 +3,7 @@
 import pkg from "../../package.json";
 import { dirname, filename, join } from "desm";
 import fs from "fs-extra";
+import pathe from "pathe";
 import { globSync } from "glob";
 import { program } from "@commander-js/extra-typings";
 import { execa } from "execa";
@@ -10,7 +11,8 @@ import ora, { type Ora } from "ora";
 import editorconfig from "editorconfig";
 import type { Promisable } from "type-fest";
 import * as inquirer from "@inquirer/prompts";
-import { astOperation_parseVersions, type TransformRecipe_AliasedTsVersions } from "./vitest-alias-update";
+import { useVitestWorkspaceAliasHandler, type TransformRecipe_AliasedTsVersions } from "./vitest-alias-update";
+import chalk from "chalk";
 
 const __dirname = dirname(import.meta.url);
 const __filename = filename(import.meta.url);
@@ -43,21 +45,24 @@ await async function main() {
         .name("npx gen-vitest")
         .description(`Generates a workspace to run Vitest with the given pinned version of typescript.`)
         .showHelpAfterError()
-        .option(`-ts, --ts-version <value>`, `The pinned typescript version to use with the Vitest workspace.`)
         .option(`--keep-temp`, `Keep the "${PATH_DIR_TEMP}" folder (on error AND success). Default: false.`)
         .parse()
         .opts()
     ;
+    const { keepTemp = false, } = params;
 
-    const { tsVersion, keepTemp = false, } = params;
+    const _print_vitestWorkspaceTsLink = `"${chalk.white.underline(PATH_FILE_VITEST_WORKSPACE_TS)}"`;
 
     const spinner = ora();
     const { asyncOperation, } = useAsyncOperation(spinner);
 
+    const _RELATIVE_ROOT = `../../`;
+    const projectRootPath = join(import.meta.url, _RELATIVE_ROOT);
+
     const Inquirer_Selection_Operations_Choices = [`add`, `remove`, `update`] as const;
     type Inquirer_Selection_Operations_Choices = (typeof Inquirer_Selection_Operations_Choices)[number];
 
-    const Inquirer_Selection_Menu_Choices = [`exit`, `run`] as const;
+    const Inquirer_Selection_Menu_Choices = [`edit changes`, `exit`, `run`] as const;
     type Inquirer_Selection_Menu_Choices = (typeof Inquirer_Selection_Menu_Choices)[number];
 
     const recipeCache: TransformRecipe_AliasedTsVersions = {
@@ -65,61 +70,37 @@ await async function main() {
         add:    [],
         update: [],
     };
+    function recipePrintFormat(): string[] {
+        const lines: string[] = []; // TODO: add mapping to value
+        const { add, remove, update, } = recipeCache;
+        if (!add.length && !remove.length && !update.length) return [];
 
-    const message_listVersions = () => astOperation_parseVersions().map(_ => `- "${_}"`).join(`\n`);
-    console.info("Parsed versions in vitest.workspace.ts:");
-    console.info(message_listVersions());
-    /**
-     * TODO:
-     *  - header data showing recipe
-     *  - while loop for adding until run or exit
-     *  - remove recipe options menu with checkbox
-     *  - "run" option disabled when recipe is empty
-     *  - implement all options
-     */
-    console.info();
-    const inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
-        message: `Choose an action:`,
-        choices: [
-            { value: `add`, },
-            { value: `remove`, },
-            { value: `update`, },
-            { value: `run`, disabled: true, },
-            { value: `exit`, },
-        ] as const,
-        default: "exit",
-    });
-
-    const inq_input_version = await inquirer.input({
-        message: "Specify a version to add:",
-        async validate(tsVersion) {
-            const tsVersion_isAvailableOnNpm = await execa(`npm view typescript@${tsVersion}`)
-                .then(() => true as const)
-                .catch(err => err instanceof Error ? err.message : String(err))
-            ;
-
-            return tsVersion_isAvailableOnNpm;
-        },
-    });
+        for (const _r_add of recipeCache.add) {
+            lines.push(`${chalk.green.bold(` + `)}${chalk.greenBright(_r_add)}`);
+        }
+        for (const _r_remove of recipeCache.remove) {
+            lines.push(`${chalk.red.bold(` - `)}${chalk.redBright(_r_remove)}`);
+        }
+        for (const { from, to, } of recipeCache.update) {
+            lines.push(`${chalk.blue(` ↷ `)}${chalk.blueBright(`${from} → ${to}`)}`);
+        }
+        return lines;
+    }
+    const transformRecipe: TransformRecipe_AliasedTsVersions = {
+        add:    ["5.4.4"],
+        remove: ["5.4.5"],
+        update: [{ from: "5.5.0-beta", to: "5.6.1-beta", }],
+    };
 
     try {
-        await asyncOperation(`Checking if typescript@${tsVersion} is available`, async ({ succeed, fail, }) => {
-            const tsVersion_isAvailableOnNpm = await execa(`npm view typescript@${tsVersion}`)
-                .then(() => true)
-                .catch(() => false)
-            ;
-
-            if (tsVersion_isAvailableOnNpm) {
-                succeed();
-            } else {
-                fail((text) => `${text}: version is not available on npm!`);
-            }
-        });
-
         await asyncOperation(`Creating temp folder "${PATH_DIR_TEMP}" to aid transactional file changes`, async ({ succeed, fail, }) => {
             try {
                 safeRmdir();
                 await fs.mkdir(join(import.meta.url, PATH_DIR_TEMP));
+                await fs.copy(
+                    join(import.meta.url, _RELATIVE_ROOT, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
+                    join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
+                );
                 succeed();
             } catch (error) {
                 const msg = error instanceof Error ? error.message : error;
@@ -127,9 +108,139 @@ await async function main() {
             }
         });
 
-        const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
+        const vitestWorkspacefilePath = join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`);
+        const {
+            astOperation_parseVersions,
+            transformVitestWorkspaceWithRecipe,
+        } = useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspacefilePath, });
 
-        return;
+        const _listVersions = astOperation_parseVersions();
+        function versionsPrint() {
+            console.info(chalk.gray(`Versions found in ${_print_vitestWorkspaceTsLink}`));
+            for (const version of _listVersions) {
+                console.info(`${chalk.gray(` · `)}${version}`);
+            }
+            console.info();
+        }
+
+        console.info();
+
+
+        type Inquirer_Menu_Choices = Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices;
+        const menuState = {
+            inq_selection_main: void 0 as Inquirer_Menu_Choices | undefined,
+        };
+
+        while (!(
+            (menuState.inq_selection_main === "run") ||
+            (menuState.inq_selection_main === "exit")
+        )) {
+            const isRecipeEmpty: boolean = [
+                recipeCache.add,
+                recipeCache.remove,
+                recipeCache.update,
+            ].every(({ length, }) => length === 0);
+
+            console.info(chalk.gray(`MENU`));
+            console.info(new inquirer.Separator().separator);
+
+            versionsPrint();
+            if (!isRecipeEmpty) console.info(chalk.gray("Chosen changes queued to run:"));
+            for (const line of recipePrintFormat()) {
+                console.info(line);
+            }
+            if (!isRecipeEmpty) console.info();
+            /**
+             * TODO:
+             *  - header data showing recipe
+             *  - while loop for adding until run or exit
+             *  - remove recipe options menu with checkbox
+             *  - "run" option disabled when recipe is empty
+             *  - implement all options
+             */
+            menuState.inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
+                message: `Choose an action:`,
+                choices: [
+                    { value: `add`, },
+                    { value: `remove`, },
+                    { value: `update`, },
+                    ...(isRecipeEmpty ? [] : [
+                        new inquirer.Separator,
+                        { value: `edit changes`, },
+                    ] as const),
+                    new inquirer.Separator,
+                    { value: `run`, disabled: true, },
+                    { value: `exit`, },
+                ] as const,
+                loop:     false,
+                pageSize: 7,
+            }, { clearPromptOnDone: false, });
+
+            switch (menuState.inq_selection_main) {
+                case "remove": {
+
+                    break;
+                }
+                case "add": {
+                    const inq_input_version = await inquirer.input({
+                        message: "Specify a version to add, or submit blank to go back:",
+                        async validate(tsVersion) {
+                            if (tsVersion === "") return true;
+                            if (_listVersions.includes(tsVersion)) {
+                                return `typescript@${tsVersion} is already in ${_print_vitestWorkspaceTsLink}`;
+                            }
+                            const maybeIncludedInQueuedChanges = ([
+                                [recipeCache.add, "add"],
+                                [recipeCache.remove, "remove"],
+                                [recipeCache.update.map(_ => _.to), "update"],
+                            ] as const).flatMap(([arr, queueType]) => arr.includes(tsVersion) ? [queueType] : []).at(0);
+                            if (maybeIncludedInQueuedChanges) {
+                                return `typescript@${tsVersion} is already in queued changes (${maybeIncludedInQueuedChanges})`;
+                            }
+
+                            const tsVersion_isAvailableOnNpm = await execa(`npm view typescript@${tsVersion}`)
+                                .then(() => true as const)
+                                .catch(err => `typescript@${tsVersion} is not available on npm!`)
+                            ;
+
+                            return tsVersion_isAvailableOnNpm;
+                        },
+                    });
+                    if (inq_input_version !== "") {
+                        recipeCache.add.push(inq_input_version);
+                    }
+                    console.info();
+                    break;
+                }
+                case "update": {
+
+                    break;
+                }
+                case "edit changes": {
+                    const changesQueued = recipePrintFormat();
+
+                    const inquirer_checkbox = inquirer.checkbox;
+                    type _Choices = Parameters<(typeof inquirer_checkbox)>[0]["choices"][number];
+
+                    const selection = await inquirer_checkbox({
+                        message: "Select which changes to remove from the queue:",
+                        choices: recipePrintFormat().map((line): _Choices => ({
+                            name:  line,
+                            value: line.trim(), // TODO: use mapped value, should be just a string, maybe an object
+                        })),
+                    });
+                    console.log(selection);
+                    break;
+                }
+                default: break;
+            }
+        }
+
+        if (menuState.inq_selection_main === "exit") return;
+
+        await transformVitestWorkspaceWithRecipe(recipeCache);
+
+        const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
 
         // await asyncOperation(`Generating updated "package.json" with new workspace folder entry`, async ({ succeed, fail, }) => {
         //     const _workspace = `workspaces/vitest-ts-${tsVersion}` as const;
@@ -221,7 +332,7 @@ await async function main() {
 
         await asyncOperation(`Copying generated files from "${PATH_DIR_TEMP}" to project`, async ({ succeed, fail, }) => {
             try {
-                await fs.copy(__join(PATH_DIR_TEMP), __join(PATH_DIR_ROOT));
+                // await fs.copy(__join(PATH_DIR_TEMP), __join(PATH_DIR_ROOT));
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
                 fail((text) => `${text}: ${message}`);

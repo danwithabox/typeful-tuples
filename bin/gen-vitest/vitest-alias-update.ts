@@ -1,126 +1,131 @@
-import { join } from "desm";
 import { createTs } from "../../vitest/utils/ts-vfs/ts-fs";
 import ts from "typescript";
 import { walkMaybeToNodeOf, walkTransform } from "../../vitest/utils/ts-vfs/walk";
 import { ESLint } from "eslint";
 import { EOL } from "node:os";
 
-/**
- * TODO:
- *  - more robust matching, such as handling rename of identifiers
- *      - blocked by the type-checker throwing errors around "flags", similar to this: https://github.com/microsoft/TypeScript/issues/58371
- */
 const CORRECT_IDENTIFIERS = {
     "defineWorkspace":           "defineWorkspace",
     "vitestConfigWithAliasedTs": "vitestConfigWithAliasedTs",
 } as const;
 
-const transformRecipe: TransformRecipe_AliasedTsVersions = {
-    add:    ["5.4.4"],
-    remove: ["5.4.5"],
-    update: [{ from: "5.5.0-beta", to: "5.6.1-beta", }],
-};
+export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspacefilePath, }: {
+    projectRootPath:         string,
+    vitestWorkspacefilePath: string,
+}) {
+    /**
+     * TODO:
+     *  - more robust matching, such as handling rename of identifiers
+     *      - blocked by the type-checker throwing errors around "flags", similar to this: https://github.com/microsoft/TypeScript/issues/58371
+     */
 
-const tsTool = createTs({
-    projectRootPath: join(import.meta.url, `../../`),
-});
+    const tsTool = createTs({
+        projectRootPath,
+    });
 
-const filePath = `./dummy-vitest.workspace.ts`;
+    function makeAdaptedSourceFile(filePath: string) {
+        const MARKER_tsEmptyLine = `// @ts-empty-line`;
 
-function makeAdaptedSourceFile(filePath: string) {
-    const MARKER_tsEmptyLine = `// @ts-empty-line`;
+        const file = tsTool.host.readFile(filePath);
+        if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
 
-    const file = tsTool.host.readFile(filePath);
-    if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
+        const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
+        const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
 
-    const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
-    const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
+        const sourceFile = ts.createSourceFile(
+            filePath,
+            encodedEmptyLines,
+            tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
+        );
+        const decodeEmptyLines = (sourceFileText: string): string => {
+            const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
+            const decoded_CLRF = decoded.join(EOL);
+            return decoded_CLRF;
+        };
 
-    const sourceFile = ts.createSourceFile(
-        filePath,
-        encodedEmptyLines,
-        tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
-    );
-    const decodeEmptyLines = (sourceFileText: string): string => {
-        const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
-        const decoded_CLRF = decoded.join(EOL);
-        return decoded_CLRF;
-    };
-
-    return {
-        sourceFile,
-        decodeEmptyLines,
-    };
-}
-
-const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(filePath);
-
-const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
-    if (ts.isExportAssignment(node)) return node;
-});
-const nodeOf_Identifier_defineWorkspace = walkMaybeToNodeOf(node => {
-    const correctName = CORRECT_IDENTIFIERS.defineWorkspace;
-
-    if (ts.isCallExpression(node)) {
-        if (ts.isIdentifier(node.expression)) {
-            if (node.expression.escapedText === correctName) return node;
-        }
+        return {
+            sourceFile,
+            decodeEmptyLines,
+        };
     }
-});
-const nodeOf_ArrayLiteralExpression = walkMaybeToNodeOf(node => {
-    if (ts.isArrayLiteralExpression(node)) return node;
-});
 
-export function astOperation_parseVersions(): string[] {
-    const node1 = nodeOf_ExportAssignment(sourceFile);
-    const node2 = nodeOf_Identifier_defineWorkspace(node1);
-    const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2);
+    const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(vitestWorkspacefilePath);
 
-    if (node_workspaceArray === void 0) throw new Error(`Couldn't find a default-exported "${CORRECT_IDENTIFIERS.defineWorkspace}()"'s array in the source file.`);
+    const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
+        if (ts.isExportAssignment(node)) return node;
+    });
+    const nodeOf_Identifier_defineWorkspace = walkMaybeToNodeOf(node => {
+        const correctName = CORRECT_IDENTIFIERS.defineWorkspace;
 
-    const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
+        if (ts.isCallExpression(node)) {
+            if (ts.isIdentifier(node.expression)) {
+                if (node.expression.escapedText === correctName) return node;
+            }
+        }
+    });
+    const nodeOf_ArrayLiteralExpression = walkMaybeToNodeOf(node => {
+        if (ts.isArrayLiteralExpression(node)) return node;
+    });
 
-    const parsedVersions = versions.map(_ => _.textOfVersion);
-    return parsedVersions;
-}
-
-await async function main() {
-    const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => (rootNode) => {
-        const node1 = nodeOf_ExportAssignment(rootNode, context);
-        const node2 = nodeOf_Identifier_defineWorkspace(node1, context);
-        const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2, context);
+    function astOperation_parseVersions(): string[] {
+        const node1 = nodeOf_ExportAssignment(sourceFile);
+        const node2 = nodeOf_Identifier_defineWorkspace(node1);
+        const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2);
 
         if (node_workspaceArray === void 0) throw new Error(`Couldn't find a default-exported "${CORRECT_IDENTIFIERS.defineWorkspace}()"'s array in the source file.`);
 
-        return walkTransform(rootNode, context, (node, abort) => {
-            if (node === node_workspaceArray) {
-                const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
-                const transformed = transformWalkResultWithRecipe(versions, transformRecipe);
-                const elements = transformed.map(_ => _.cloneNodeOfArrayElement);
+        const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
 
-                return ts.factory.updateArrayLiteralExpression(node_workspaceArray,
-                    elements,
-                );
-            }
-        });
+        const parsedVersions = versions.map(_ => _.textOfVersion);
+        return parsedVersions;
+    }
+
+    async function transformVitestWorkspaceWithRecipe(transformRecipe: TransformRecipe_AliasedTsVersions) {
+        const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => (rootNode) => {
+            const node1 = nodeOf_ExportAssignment(rootNode, context);
+            const node2 = nodeOf_Identifier_defineWorkspace(node1, context);
+            const node_workspaceArray = nodeOf_ArrayLiteralExpression(node2, context);
+
+            if (node_workspaceArray === void 0) throw new Error(`Couldn't find a default-exported "${CORRECT_IDENTIFIERS.defineWorkspace}()"'s array in the source file.`);
+
+            return walkTransform(rootNode, context, (node, abort) => {
+                if (node === node_workspaceArray) {
+                    const versions = interpretAst_workspaceArray_versions(node_workspaceArray);
+                    const transformed = transformWalkResultWithRecipe(versions, transformRecipe);
+                    const elements = transformed.map(_ => _.cloneNodeOfArrayElement);
+
+                    return ts.factory.updateArrayLiteralExpression(node_workspaceArray,
+                        elements,
+                    );
+                }
+            });
+        };
+
+        const transformationResult = ts.transform(sourceFile, [transformer], tsTool.compilerOptions);
+        /**
+         * Printer is required, because .text, and .getText, etc, doesn't take changes into account:
+         * https://github.com/microsoft/TypeScript/issues/50204
+         */
+        const printer = ts.createPrinter();
+
+        const source_new = printer.printFile(transformationResult.transformed[0]);
+        const source_decoded = decodeEmptyLines(source_new);
+
+        const eslint = new ESLint({ fix: true, });
+        const [{ output: linted, }] = await eslint.lintText(source_decoded);
+
+        if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
+        console.log("vitestWorkspacefilePath", vitestWorkspacefilePath);
+        console.log("linted", linted);
+        // tsTool.host.writeFile(filePath, linted, false);
+    }
+
+    return {
+        astOperation_parseVersions,
+        transformVitestWorkspaceWithRecipe,
     };
 
-    const transformationResult = ts.transform(sourceFile, [transformer], tsTool.compilerOptions);
-    /**
-     * Printer is required, because .text, and .getText, etc, doesn't take changes into account:
-     * https://github.com/microsoft/TypeScript/issues/50204
-     */
-    const printer = ts.createPrinter();
-
-    const source_new = printer.printFile(transformationResult.transformed[0]);
-    const source_decoded = decodeEmptyLines(source_new);
-
-    const eslint = new ESLint({ fix: true, });
-    const [{ output: linted, }] = await eslint.lintText(source_decoded);
-
-    if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
-    // tsTool.host.writeFile(filePath, linted, false);
-}();
+}
 
 /** Should be executed in the order of remove, add, update */
 export type TransformRecipe_AliasedTsVersions = {
