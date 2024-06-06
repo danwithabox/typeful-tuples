@@ -115,9 +115,7 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
         const [{ output: linted, }] = await eslint.lintText(source_decoded);
 
         if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
-        console.log("vitestWorkspacefilePath", vitestWorkspacefilePath);
-        console.log("linted", linted);
-        // tsTool.host.writeFile(filePath, linted, false);
+        tsTool.host.writeFile(vitestWorkspacefilePath, linted, false);
     }
 
     return {

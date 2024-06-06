@@ -47,58 +47,18 @@ await async function main() {
     console.info();
     const { keepTemp = false, internet, } = params;
 
-    const { fetchAvailableTsVersions, isTsVersionAvailableOnNpm, } = useNpmViewedTsVersions({ noInternet: !internet, });
-
-    const _print_vitestWorkspaceTsLink = `"${chalk.white.underline(PATH_FILE_VITEST_WORKSPACE_TS)}"`;
+    const _printFileLink_vitestWorkspaceTs = `"${chalk.white.underline(PATH_FILE_VITEST_WORKSPACE_TS)}"`;
+    const _printFileLink_packageJson = `"${chalk.white.underline(PATH_FILE_PACKAGE_JSON)}"`;
 
     const spinner = ora();
     const { asyncOperation, } = useAsyncOperation(spinner);
 
-    const projectRootPath = join(import.meta.url, PATH_DIR_ROOT);
 
     const Inquirer_Selection_Operations_Choices = [`add`, `remove`, `update`] as const;
     type Inquirer_Selection_Operations_Choices = (typeof Inquirer_Selection_Operations_Choices)[number];
 
-    const Inquirer_Selection_Menu_Choices = [`edit changes`, `exit`, `run`] as const;
+    const Inquirer_Selection_Menu_Choices = [`preview`, `edit changes`, `exit`] as const;
     type Inquirer_Selection_Menu_Choices = (typeof Inquirer_Selection_Menu_Choices)[number];
-
-    const recipeCache: TransformRecipe_AliasedTsVersions = {
-        remove: [],
-        add:    [],
-        update: [],
-    };
-    function isVersionMaybeIncludedInRecipeCache(tsVersion: string): "add" | "remove" | "update" | undefined {
-        const maybeIncludedInQueuedChanges = ([
-            [recipeCache.add, "add"],
-            [recipeCache.remove, "remove"],
-            [recipeCache.update.map(_ => _.to), "update"],
-        ] as const).flatMap(([arr, queueType]) => arr.includes(tsVersion) ? [queueType] : []).at(0);
-        return maybeIncludedInQueuedChanges;
-    }
-    type RecipeListFormatElement = |(
-        | { type: "add",    text: string, value: TransformRecipe_AliasedTsVersions["add"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["add"], }
-        | { type: "remove", text: string, value: TransformRecipe_AliasedTsVersions["remove"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["remove"], }
-        | { type: "update", text: string, value: TransformRecipe_AliasedTsVersions["update"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["update"], }
-    );
-    function recipeListFormat(): RecipeListFormatElement[] {
-        const lines: RecipeListFormatElement[] = [];
-        const { add, remove, update, } = recipeCache;
-        if (!add.length && !remove.length && !update.length) return [];
-
-        for (const [originalIndex, _r_add] of recipeCache.add.entries()) {
-            const text = `${chalk.green.bold(` + `)}${chalk.greenBright(_r_add)}`;
-            lines.push({ type: "add", text, value: _r_add, originalIndex, arrayRef: recipeCache.add, });
-        }
-        for (const [originalIndex, _r_remove] of recipeCache.remove.entries()) {
-            const text = `${chalk.red.bold(` - `)}${chalk.redBright(_r_remove)}`;
-            lines.push({ type: "remove", text, value: _r_remove, originalIndex, arrayRef: recipeCache.remove, });
-        }
-        for (const [originalIndex, { from, to, }] of recipeCache.update.entries()) {
-            const text = `${chalk.blue(` ↷ `)}${chalk.blueBright(`${from} → ${to}`)}`;
-            lines.push({ type: "update", text, value: { from, to, }, originalIndex, arrayRef: recipeCache.update, });
-        }
-        return lines;
-    }
 
     try {
         await asyncOperation(`Creating temp folder "${PATH_DIR_TEMP}" to aid transactional file changes`, async ({ succeed, fail, }) => {
@@ -119,9 +79,22 @@ await async function main() {
                 fail((text) => `${text}: couldn't create folder "${PATH_DIR_TEMP}": ${msg}`);
             }
         });
+
+        const projectRootPath = join(import.meta.url, PATH_DIR_ROOT);
+
+        const usingNpmViewTypescriptVersions = useNpmViewTypescriptVersions({ noInternet: !internet, });
+        const usingVitestWorkspaceAliasHandler = useVitestWorkspaceAliasHandler({
+            projectRootPath,
+            vitestWorkspacefilePath: join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
+        });
+        const usingRecipeCache = useRecipeCache();
+        const usingParsedVersions = useParsedVersions(usingVitestWorkspaceAliasHandler.astOperation_parseVersions());
+
+        function disableReasonMessage(message: string) { return `(disabled - ${message})`; }
+
         if (internet) await asyncOperation(`Fetching available typescript versions from npm`, async ({ succeed, fail, }) => {
             try {
-                await fetchAvailableTsVersions();
+                await usingNpmViewTypescriptVersions.fetchAvailableTsVersions();
                 succeed();
             } catch (error) {
                 const msg = error instanceof Error ? error.message : error;
@@ -130,135 +103,163 @@ await async function main() {
             }
         });
 
-        const vitestWorkspacefilePath = join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`);
-        const {
-            astOperation_parseVersions,
-            transformVitestWorkspaceWithRecipe,
-        } = useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspacefilePath, });
-
-        const _listVersions = astOperation_parseVersions();
-        function versionsPrint() {
-            console.info(chalk.gray(`Versions found in ${_print_vitestWorkspaceTsLink}`));
-            for (const version of _listVersions) {
-                console.info(`${chalk.gray(` · `)}${version}`);
-            }
-            console.info();
-        }
-
-        console.info();
-
         type Inquirer_Menu_Choices = Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices;
         const menuState = {
             inq_selection_main: void 0 as Inquirer_Menu_Choices | undefined,
+            previewAccepted:    false,
         };
 
         while (!(
-            (menuState.inq_selection_main === "run") ||
-            (menuState.inq_selection_main === "exit")
+            (menuState.inq_selection_main === "exit") ||
+            (menuState.previewAccepted)
         )) {
-            const isRecipeEmpty: boolean = [
-                recipeCache.add,
-                recipeCache.remove,
-                recipeCache.update,
-            ].every(({ length, }) => length === 0);
-
+            //#region Menu header
+            console.info(new inquirer.Separator().separator);
             console.info(chalk.gray(`MENU`));
             console.info(new inquirer.Separator().separator);
-
-            versionsPrint();
-            if (!isRecipeEmpty) console.info(chalk.gray("Chosen changes queued to run:"));
-            for (const line of recipeListFormat()) {
-                console.info(line.text);
+            console.info(chalk.gray(`Versions found in ${_printFileLink_vitestWorkspaceTs}`));
+            for (const line of usingParsedVersions.getVersionsAsLines(usingParsedVersions.getVersions())) {
+                console.info(line);
             }
-            if (!isRecipeEmpty) console.info();
-            /**
-             * TODO:
-             *  - preview and run
-             *      - load package.json from temp folder
-             *      - commit to temp file, offer preview, also show versions, which can be used to update npm too
-             */
-            menuState.inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
-                message: `Choose an action:`,
-                choices: [
-                    { value: `add`, },
-                    { value: `remove`, },
-                    { value: `update`, },
-                    ...(isRecipeEmpty ? [] : [
-                        new inquirer.Separator,
-                        { value: `edit changes`, },
-                    ] as const),
-                    new inquirer.Separator,
-                    { value: `run`, disabled: isRecipeEmpty, },
-                    { value: `exit`, },
-                ] as const,
-                loop:     false,
-                pageSize: 10,
-            }, { clearPromptOnDone: false, });
+            console.info();
 
-            function validateAdd(tsVersion: string) {
-                if (tsVersion === "") return true;
-                if (_listVersions.includes(tsVersion)) {
-                    return `typescript@${tsVersion} is already in ${_print_vitestWorkspaceTsLink}`;
-                }
-                const maybeIncludedInQueuedChanges = isVersionMaybeIncludedInRecipeCache(tsVersion);
-                if (maybeIncludedInQueuedChanges) {
-                    return `typescript@${tsVersion} is already in queued changes (${maybeIncludedInQueuedChanges})`;
-                }
+            const _isRecipeCacheEmpty = usingRecipeCache.isRecipeCacheEmpty();
+            const _versionsAfterApply = usingRecipeCache.applyRecipeCacheToVersions(usingParsedVersions.getVersions());
+            const _isResultEmpty = _versionsAfterApply.length === 0;
 
-                return isTsVersionAvailableOnNpm(tsVersion);
+            if (!_isRecipeCacheEmpty) {
+                console.info(chalk.gray("Chosen changes queued:"));
+                for (const line of usingRecipeCache.recipeCacheAsLines()) {
+                    console.info(line.text);
+                }
+                console.info();
             }
 
-            switch (menuState.inq_selection_main) {
-                case "remove": {
-                    const inquirer_checkbox = inquirer.checkbox<string>;
-                    type _Choices = Parameters<(typeof inquirer_checkbox)>[0]["choices"][number];
-
-                    const selection = await inquirer_checkbox({
-                        message: `Select which version(s) to remove from ${PATH_FILE_VITEST_WORKSPACE_TS}`,
-                        choices: _listVersions.map((version): _Choices => {
-                            const disabled: boolean = recipeCache.remove.includes(version);
-                            return {
-                                name:  disabled ? `${version} (already in queued changes)` : version,
-                                value: version,
-                                disabled,
-                            };
-                        }),
-                    });
-
-                    for (const version of selection) {
-                        recipeCache.remove.push(version);
-                    }
-                    console.info();
-                    break;
+            /** Returns undefined when `choice` is actually a separator */
+            function isChoiceDisabled(choice: inquirer.Separator | { type?: undefined, disabled?: string | boolean | undefined, }): boolean | undefined {
+                if (choice.type === "separator") return void 0;
+                else {
+                    const _disabled = choice.disabled ?? false;
+                    const disabled = (typeof _disabled === "string") ? true : _disabled;
+                    return disabled;
                 }
-                case "add": {
-                    const inq_input_version = await inquirer.input({
-                        message: "Specify a version to add, or submit blank to go back:",
+            }
+            function makeMenuOption_add() {
+                async function inquiry(
+                    message: string,
+                    messages: {
+                        onVersionIsInParsedVersions:     string,
+                        onVersionIsInRecipeCache_add:    string,
+                        onVersionIsInRecipeCache_update: string,
+                    },
+                ): Promise<string | undefined> {
+                    const input = await inquirer.input({
+                        message,
                         validate(tsVersion) {
-                            return validateAdd(tsVersion);
+                            const { included: isVersionInParsedVersions, } = usingParsedVersions.isVersionInParsedVersions(tsVersion);
+                            if (isVersionInParsedVersions) return messages.onVersionIsInParsedVersions;
+                            const { included: isVersionInRecipeCache_add, } = usingRecipeCache.isVersionInRecipeCache("add", tsVersion);
+                            if (isVersionInRecipeCache_add) return messages.onVersionIsInRecipeCache_add;
+                            const { included: isVersionInRecipeCache_update, } = usingRecipeCache.isVersionInRecipeCache("update_to", tsVersion);
+                            if (isVersionInRecipeCache_update) return messages.onVersionIsInRecipeCache_update;
+                            const validate_isTsVersionAvailableOnNpm = usingNpmViewTypescriptVersions.isTsVersionAvailableOnNpm(tsVersion);
+                            return validate_isTsVersionAvailableOnNpm;
                         },
                     });
-                    if (inq_input_version !== "") {
-                        recipeCache.add.push(inq_input_version);
-                    }
-                    console.info();
-                    break;
+                    return input === "" ? void 0 : input;
                 }
-                case "update": {
-                    const inquirer_select = inquirer.select<string>;
-                    type _Choices = Parameters<(typeof inquirer_select)>[0]["choices"][number];
+                return {
+                    inquiry,
+                };
+            }
+            function makeMenuOption_remove() {
+                type _Choices = OverrideProperties<
+                    Exclude<Parameters<(typeof inquirer.checkbox<string>)>[0]["choices"][number], inquirer.Separator>,
+                    { disabled: { isVersionInRecipeCache_remove: boolean, isVersionInRecipeCache_update: boolean, }, }
+                >;
+                const choices: _Choices[] = usingParsedVersions.getVersions().map(tsVersion => {
+                    const { included: isVersionInRecipeCache_remove, } = usingRecipeCache.isVersionInRecipeCache("remove", tsVersion);
+                    const { included: isVersionInRecipeCache_update, } = usingRecipeCache.isVersionInRecipeCache("update_from", tsVersion);
+                    return {
+                        value:    tsVersion,
+                        disabled: {
+                            isVersionInRecipeCache_update,
+                            isVersionInRecipeCache_remove,
+                        },
+                    };
+                });
+                const shouldBeDisabled: boolean = choices.every(choice => isChoiceDisabled({
+                    ...choice,
+                    disabled: choice.disabled.isVersionInRecipeCache_update || choice.disabled.isVersionInRecipeCache_remove,
+                }) ?? true);
 
-                    const selection = await inquirer_select({
-                        message: `Select which version to change in ${PATH_FILE_VITEST_WORKSPACE_TS}, keeping related config object intact`,
+                async function inquiry(
+                    message: string,
+                    messages: {
+                        onChoiceDisabled_alreadyInRemove: string,
+                        onChoiceDisabled_alreadyInUpdate: string,
+                    },
+                ): Promise<string[]> {
+                    const selection = await inquirer.checkbox<string>({
+                        message,
                         choices: [
-                            ..._listVersions.map((versionToUpdate): _Choices => {
-                                const disabled: boolean = recipeCache.update.some(({ from, }) => from === versionToUpdate);
-                                return {
-                                    name:  disabled ? `${versionToUpdate} (already in queued changes)` : versionToUpdate,
-                                    value: versionToUpdate,
-                                    disabled,
-                                };
-                            }),
+                            ...choices.map(choice => ({
+                                ...choice,
+                                disabled: choice.disabled.isVersionInRecipeCache_remove
+                                    ? messages.onChoiceDisabled_alreadyInRemove
+                                    : choice.disabled.isVersionInRecipeCache_update
+                                        ? messages.onChoiceDisabled_alreadyInUpdate
+                                        : false,
+                            })),
+                        ],
+                    });
+
+                    return selection;
+                }
+                return {
+                    shouldBeDisabled,
+                    inquiry,
+                };
+            }
+            function makeMenuOption_update() {
+                type _Choices = OverrideProperties<
+                    Exclude<Parameters<(typeof inquirer.select<string>)>[0]["choices"][number], inquirer.Separator>,
+                    { disabled: { isVersionInRecipeCache_update: boolean, isVersionInRecipeCache_remove: boolean, }, }
+                >;
+                const choices: _Choices[] = usingParsedVersions.getVersions().map(tsVersion => {
+                    const { included: isVersionInRecipeCache_update, } = usingRecipeCache.isVersionInRecipeCache("update_from", tsVersion);
+                    const { included: isVersionInRecipeCache_remove, } = usingRecipeCache.isVersionInRecipeCache("remove", tsVersion);
+                    return {
+                        value:    tsVersion,
+                        disabled: {
+                            isVersionInRecipeCache_update,
+                            isVersionInRecipeCache_remove,
+                        },
+                    };
+                });
+                const shouldBeDisabled: boolean = choices.every(choice => isChoiceDisabled({
+                    ...choice,
+                    disabled: choice.disabled.isVersionInRecipeCache_update || choice.disabled.isVersionInRecipeCache_remove,
+                }) ?? true);
+
+                async function inquiry(
+                    message: string,
+                    messages: {
+                        onChoiceDisabled_alreadyInUpdate: string,
+                        onChoiceDisabled_alreadyInRemove: string,
+                    },
+                ): Promise<string | undefined> {
+                    const selection = await inquirer.select<string>({
+                        message,
+                        choices: [
+                            ...choices.map(choice => ({
+                                ...choice,
+                                disabled: choice.disabled.isVersionInRecipeCache_update
+                                    ? messages.onChoiceDisabled_alreadyInUpdate
+                                    : choice.disabled.isVersionInRecipeCache_remove
+                                        ? messages.onChoiceDisabled_alreadyInRemove
+                                        : false,
+                            })),
                             new inquirer.Separator,
                             {
                                 name:  "Back",
@@ -267,18 +268,86 @@ await async function main() {
                         ],
                     });
 
-                    if (selection !== "") {
-                        const inq_input_version = await inquirer.input({
-                            message: `Specify a version to add, or submit blank to go back:`,
-                            validate(tsVersion) {
-                                return validateAdd(tsVersion);
+                    return selection === "" ? void 0 : selection;
+                }
+                return {
+                    shouldBeDisabled,
+                    inquiry,
+                };
+            }
+
+            const menuOption_remove = makeMenuOption_remove();
+            const menuOption_add = makeMenuOption_add();
+            const menuOption_update = makeMenuOption_update();
+            //#endregion
+
+            menuState.inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
+                message: `Choose an action:`,
+                choices: [
+                    { value: `add`, },
+                    { value: `remove`, disabled: menuOption_remove.shouldBeDisabled ? disableReasonMessage("every found version is awaiting changes") : false, },
+                    { value: `update`, disabled: menuOption_update.shouldBeDisabled ? disableReasonMessage("every found version is awaiting changes") : false, },
+                    new inquirer.Separator,
+                    { value: `edit changes`, disabled: _isRecipeCacheEmpty ? disableReasonMessage(`no queued changes`) : false, },
+                    new inquirer.Separator,
+                    { value: `preview`, name: `preview before run`, disabled: _isRecipeCacheEmpty ? disableReasonMessage(`no queued changes`) : _isResultEmpty ? disableReasonMessage(`result would be empty`) : false, },
+                    { value: `exit`, },
+                ] as const,
+                loop:     true,
+                pageSize: 10,
+            });
+
+            switch (menuState.inq_selection_main) {
+                case "add": {
+                    const result = await menuOption_add.inquiry(
+                        `Specify a version to add, or submit blank to go back:`,
+                        {
+                            onVersionIsInParsedVersions:     `Version is already present in ${_printFileLink_vitestWorkspaceTs}`,
+                            onVersionIsInRecipeCache_update: `Version is already used in a queued version update, adding it would result in a duplicate workspace entry`,
+                            onVersionIsInRecipeCache_add:    `Version is already queued to be added`,
+                        },
+                    );
+                    if (result !== void 0) {
+                        usingRecipeCache.recipeCache.add.push(result);
+                    }
+                    console.info();
+                    break;
+                }
+                case "remove": {
+                    const result = await menuOption_remove.inquiry(
+                        `Select which version(s) to remove from ${PATH_FILE_VITEST_WORKSPACE_TS}`,
+                        {
+                            onChoiceDisabled_alreadyInUpdate: disableReasonMessage(`already queued to be updated`),
+                            onChoiceDisabled_alreadyInRemove: disableReasonMessage(`already queued to be removed`),
+                        },
+                    );
+                    for (const version of result) {
+                        usingRecipeCache.recipeCache.remove.push(version);
+                    }
+                    console.info();
+                    break;
+                }
+                case "update": {
+                    const result_select = await menuOption_update.inquiry(
+                        `Select which version to change in ${PATH_FILE_VITEST_WORKSPACE_TS}, keeping related config object intact`,
+                        {
+                            onChoiceDisabled_alreadyInRemove: disableReasonMessage(`already queued to be removed`),
+                            onChoiceDisabled_alreadyInUpdate: disableReasonMessage(`already queued to be updated`),
+                        },
+                    );
+                    if (result_select !== void 0) {
+                        const result_input = await menuOption_add.inquiry(
+                            `Specify a version to add, or submit blank to go back:`,
+                            {
+                                onVersionIsInParsedVersions:     `Version is already present in ${_printFileLink_vitestWorkspaceTs}`,
+                                onVersionIsInRecipeCache_update: `Version is already used in a queued version update, adding it would result in a duplicate workspace entry`,
+                                onVersionIsInRecipeCache_add:    `Version is already queued to be added`,
                             },
-                        });
-                        if (inq_input_version !== "") {
-                            recipeCache.update.push({ from: selection, to: inq_input_version, });
+                        );
+                        if (result_input !== void 0) {
+                            usingRecipeCache.recipeCache.update.push({ from: result_select, to: result_input, });
                         }
                     }
-
                     console.info();
                     break;
                 }
@@ -288,17 +357,32 @@ await async function main() {
 
                     const selection = await inquirer_checkbox({
                         message: "Select which changes to remove from the queue:",
-                        choices: recipeListFormat().map((line): _Choices => ({
+                        choices: usingRecipeCache.recipeCacheAsLines().map((line): _Choices => ({
                             name:  line.text,
                             value: line,
                         })),
                     });
 
-                    for (const element of selection) {
-                        const { originalIndex, arrayRef, } = element; // TODO: this doesn't work when removing a few at once
+                    /** Sort by position in array in reverse, so that splice doesn't change the remaining indices as the loop runs */
+                    const selectionSortedForRemoval = selection.sort((a, b) => b.originalIndex - a.originalIndex);
+                    for (const element of selectionSortedForRemoval) {
+                        const { originalIndex, arrayRef, } = element;
                         arrayRef.splice(originalIndex, 1);
                     }
                     console.info();
+                    break;
+                }
+                case "preview": {
+                    console.info(chalk.gray("Versions after applying queued changes:"));
+                    for (const line of usingParsedVersions.getVersionsAsLines(_versionsAfterApply)) {
+                        console.info(line);
+                    }
+                    console.info();
+                    const isApplyRequested = await inquirer.confirm({
+                        message: "Apply queued changes to temporary files?",
+                        default: false,
+                    });
+                    if (isApplyRequested) menuState.previewAccepted = true;
                     break;
                 }
                 default: break;
@@ -307,29 +391,52 @@ await async function main() {
 
         if (menuState.inq_selection_main === "exit") return;
 
-        await transformVitestWorkspaceWithRecipe(recipeCache);
+        await asyncOperation(`Updating temporary ${_printFileLink_vitestWorkspaceTs} with aliased typescript packages`, async ({ succeed, fail, }) => {
+            try {
+                await usingVitestWorkspaceAliasHandler.transformVitestWorkspaceWithRecipe(usingRecipeCache.recipeCache);
+                succeed();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : error;
+                fail((text) => `${text}: ${message}`);
+            }
+        });
 
         const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
 
-        await asyncOperation(`Updating temp "package.json" with aliased typescript packages`, async ({ succeed, fail, }) => {
+        await asyncOperation(`Updating temporary ${_printFileLink_packageJson} with aliased typescript packages`, async ({ succeed, fail, }) => {
+            /**
+             * TODO:
+             *  - preview and run
+             *      - commit to temp file, then wait for apply, show links to temp files
+             */
             const path_temp_package_json = __join(PATH_DIR_TEMP, PATH_FILE_PACKAGE_JSON);
 
-            const packageJson = (() => {
+            const _packageJson = (() => {
                 const raw = fs.readFileSync(path_temp_package_json, "utf-8");
                 const packageJson = JSON.parse(raw) as OverrideProperties<typeof pkg, { devDependencies: Record<string, string>, }>;
                 return packageJson;
             })();
 
-            packageJson.devDependencies;
+            const _versionEntriesAfterApply = usingRecipeCache.applyRecipeCacheToVersions(usingParsedVersions.getVersions()).map((version): [string, string] => {
+                // TODO: extract this prefix to be common
+                const key = `typescript-${version}`;
+                const prop = `npm:typescript@${version}`;
+                return [key, prop];
+            });
 
-            const isWorkspaceAlreadyPresent = pkg.workspaces.includes(_workspace);
-            if (isWorkspaceAlreadyPresent) fail((text) => `${text}: workspace already exists`);
-
-            const workspaces = [_workspace, ...pkg.workspaces].sort();
-            const _pkg = { ...pkg, workspaces, };
+            const devDependencies = Object.fromEntries(
+                [
+                    ...Object.entries(_packageJson.devDependencies).flatMap(([key, prop]) => prop.startsWith("typescript-") ? [] : [[key, prop]]),
+                    ..._versionEntriesAfterApply,
+                ],
+            );
+            const packageJson: typeof _packageJson = {
+                ..._packageJson,
+                devDependencies,
+            };
 
             try {
-                await fs.writeFile(path_temp_package_json, JSON.stringify(_pkg, null, indent_size));
+                await fs.writeFile(path_temp_package_json, JSON.stringify(packageJson, null, indent_size));
             } catch (error) {
                 const message = error instanceof Error ? error.message : error;
                 fail((text) => `${text}: ${message}`);
@@ -337,36 +444,53 @@ await async function main() {
 
             succeed();
         });
-
-        await asyncOperation(`Copying generated files from "${PATH_DIR_TEMP}" to project`, async ({ succeed, fail, }) => {
-            try {
-                // await fs.copy(__join(PATH_DIR_TEMP), __join(PATH_DIR_ROOT));
-            } catch (error) {
-                const message = error instanceof Error ? error.message : error;
-                fail((text) => `${text}: ${message}`);
-            }
-
-            succeed();
-        });
-
-        // await asyncOperation(`Running npm install to integrate new workspace "${NPM_WORKSPACE_NEW}"`, async ({ succeed, fail, pause, resume, }) => {
-        //     try {
-        //         pause();
-        //         const proc = execa(`npm install`);
-        //         proc.pipeStdout?.(process.stdout);
-        //         proc.pipeStderr?.(process.stderr);
-        //         await proc;
-        //         resume();
-        //     } catch (error) {
-        //         const message = error instanceof Error ? error.message : error;
-        //         fail((text) => `${text}: ${message}`);
-        //     }
-
-        //     succeed();
-        // });
 
         console.info();
-        spinner.succeed(`Generation done!`);
+        const isApplyTempConfirmed = await inquirer.confirm({
+            message: "Apply temporary files to project?",
+            default: false,
+        });
+        console.info();
+        if (isApplyTempConfirmed) {
+            await asyncOperation(`Copying generated files from "${PATH_DIR_TEMP}" to project`, async ({ succeed, fail, }) => {
+                try {
+                    await fs.copy(__join(PATH_DIR_TEMP), __join(PATH_DIR_ROOT));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : error;
+                    fail((text) => `${text}: ${message}`);
+                }
+
+                succeed();
+            });
+
+            console.info();
+            const isInstallConfirmed = await inquirer.confirm({
+                message: "Install with npm?",
+                default: false,
+            });
+            console.info();
+            if (isInstallConfirmed) {
+                await asyncOperation(`Running npm install to install files`, async ({ succeed, fail, pause, resume, }) => {
+                    try {
+                        pause();
+                        const proc = execa(`npm install`);
+                        proc.pipeStdout?.(process.stdout);
+                        proc.pipeStderr?.(process.stderr);
+                        await proc;
+                        resume();
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : error;
+                        fail((text) => `${text}: ${message}`);
+                    }
+
+                    succeed();
+                });
+
+                console.info();
+            }
+        }
+
+        spinner.succeed(`Done!`);
         spinner.info(`Run "npm run test" from the project root to test against every aliased TS version, including the newly generated one!`);
     } catch (error) {
         console.info();
@@ -388,7 +512,23 @@ await async function main() {
 
 }();
 
-function useNpmViewedTsVersions(opts?: { noInternet?: boolean, }) {
+function useParsedVersions(versions: string[]) {
+    function getVersionsAsLines(versions: readonly string[]) {
+        return versions.map(version => `${chalk.gray(` · `)}${version}`);
+    }
+    function isVersionInParsedVersions(tsVersion: string): IsIncludedResult {
+        const indexOf = versions.indexOf(tsVersion);
+        const included = indexOf !== -1;
+        return { included, indexOf, };
+    }
+
+    return {
+        getVersions() { return Object.freeze([...versions]); },
+        getVersionsAsLines,
+        isVersionInParsedVersions,
+    };
+}
+function useNpmViewTypescriptVersions(opts?: { noInternet?: boolean, }) {
     const { noInternet = false, } = opts ?? {};
 
     const versions = [] as string[];
@@ -422,6 +562,95 @@ function useNpmViewedTsVersions(opts?: { noInternet?: boolean, }) {
         isTsVersionAvailableOnNpm,
         getVersions() { return Object.freeze([...versions]); },
     };
+}
+
+type IsIncludedResult = { included: true, indexOf: number, } | { included: false, };
+type RecipeListFormatElement = |(
+    | { type: "add",    text: string, value: TransformRecipe_AliasedTsVersions["add"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["add"], }
+    | { type: "remove", text: string, value: TransformRecipe_AliasedTsVersions["remove"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["remove"], }
+    | { type: "update", text: string, value: TransformRecipe_AliasedTsVersions["update"][number], originalIndex: number, arrayRef: TransformRecipe_AliasedTsVersions["update"], }
+);
+function useRecipeCache() {
+    const recipeCache: TransformRecipe_AliasedTsVersions = {
+        remove: [],
+        add:    [],
+        update: [],
+    };
+    function recipeCacheAsLines(): RecipeListFormatElement[] {
+        const lines: RecipeListFormatElement[] = [];
+        const { add, remove, update, } = recipeCache;
+        if (!add.length && !remove.length && !update.length) return [];
+
+        for (const [originalIndex, _r_add] of recipeCache.add.entries()) {
+            const text = `${chalk.green.bold(` + `)}${chalk.greenBright(_r_add)}`;
+            lines.push({ type: "add", text, value: _r_add, originalIndex, arrayRef: recipeCache.add, });
+        }
+        for (const [originalIndex, _r_remove] of recipeCache.remove.entries()) {
+            const text = `${chalk.red.bold(` - `)}${chalk.redBright(_r_remove)}`;
+            lines.push({ type: "remove", text, value: _r_remove, originalIndex, arrayRef: recipeCache.remove, });
+        }
+        for (const [originalIndex, { from, to, }] of recipeCache.update.entries()) {
+            const text = `${chalk.blue(` ↷ `)}${chalk.blueBright(`${from} → ${to}`)}`;
+            lines.push({ type: "update", text, value: { from, to, }, originalIndex, arrayRef: recipeCache.update, });
+        }
+        return lines;
+    }
+    const isRecipeCacheEmpty = (): boolean => [
+        recipeCache.add,
+        recipeCache.remove,
+        recipeCache.update,
+    ].every(({ length, }) => length === 0);
+
+    function isVersionInRecipeCache(where: "add" | "remove" | "update_from" | "update_to", tsVersion: string): IsIncludedResult {
+        switch (where) {
+            case "add": {
+                const indexOf = recipeCache.add.indexOf(tsVersion);
+                const included = indexOf !== -1;
+                return { included, indexOf, };
+            }
+            case "remove": {
+                const indexOf = recipeCache.remove.indexOf(tsVersion);
+                const included = indexOf !== -1;
+                return { included, indexOf, };
+            }
+            case "update_from": {
+                const indexOf = recipeCache.update.findIndex(({ from, }) => from === tsVersion);
+                const included = indexOf !== -1;
+                return { included, indexOf, };
+            }
+            case "update_to": {
+                const indexOf = recipeCache.update.findIndex(({ to, }) => to === tsVersion);
+                const included = indexOf !== -1;
+                return { included, indexOf, };
+            }
+            default: { const _never: never = where; return _never; }
+        }
+    }
+
+    function applyRecipeCacheToVersions(originalVersions: readonly string[]): string[] {
+        const resultVersions = [...originalVersions];
+        for (const version of recipeCache.remove) {
+            const index = resultVersions.indexOf(version);
+            if (index !== -1) resultVersions.splice(index, 1);
+        }
+        for (const version of recipeCache.add) {
+            resultVersions.push(version);
+        }
+        for (const { from: version_from, to: version_to, } of recipeCache.update) {
+            const index = resultVersions.indexOf(version_from);
+            if (index !== -1) resultVersions.splice(index, 1, version_to);
+        }
+        const sorted = resultVersions.sort((a, b) => b.toLocaleLowerCase().localeCompare(a.toLocaleLowerCase()));
+        return sorted;
+    }
+
+    return {
+        recipeCache,
+        recipeCacheAsLines,
+        isRecipeCacheEmpty,
+        isVersionInRecipeCache,
+        applyRecipeCacheToVersions,
+    } as const;
 }
 
 /** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
