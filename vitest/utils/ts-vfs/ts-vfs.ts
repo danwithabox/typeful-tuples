@@ -169,7 +169,7 @@ export function createVirtualTs(params: {
         }
 
         /**
-         * If no line is marked with `$l`, then all semantis issues of the file are returned.
+         * If no line is marked with `$l`, then all semantic, issues of the file are returned.
          */
         function getSemanticDiagnostics<T extends VirtualFile>(
             virtualFile: T,
@@ -189,17 +189,26 @@ export function createVirtualTs(params: {
             })();
             upsertSourceFile(fileName, content);
 
+            type TsVfs_ToolingResult_SemanticDiagnostic = {
+                diag:  ts.Diagnostic,
+                lines: number[],
+                start: LnCol & { position: number, },
+                end:   LnCol & { position: number, },
+            };
+            type TsVfs_ToolingResult_SemanticDiagnostic_Processed = {
+                code:     number,
+                messages: TsVfs_ToolingResult_SemanticDiagnostic_Processed_UnwrappedDiagnosticMessageChain[],
+                start:    LnCol & { position: number, },
+                end:      LnCol & { position: number, },
+                length:   number | undefined,
+                lines:    number[],
+            };
             const raw_queryResult = (() => {
                 const diag_semantic = vfsEnv.languageService.getSemanticDiagnostics(fileName);
                 const sourceFile = vfsEnv.getSourceFile(fileName);
                 if (sourceFile === void 0) throw new Error("getSourceFile didn't return a file");
 
-                const diags: {
-                    diag:  ts.Diagnostic,
-                    lines: number[],
-                    start: LnCol & { position: number, },
-                    end:   LnCol & { position: number, },
-                }[] = [];
+                const diags: TsVfs_ToolingResult_SemanticDiagnostic[] = [];
                 for (const diag of diag_semantic) {
                     const { start, length, } = diag;
 
@@ -218,17 +227,20 @@ export function createVirtualTs(params: {
                 return diags;
             })();
 
-            const entries = raw_queryResult ?? [];
+            const entries = raw_queryResult;
             const diagnosticsRaw = entries.map(({ diag, }) => diag);
-            const diagnostics = entries.map(({ diag, lines, start, end, }) => {
-                const { code, messageText, length, } = diag;
-                return { code, messageText, start, end, length, lines, };
+            const diagnostics = entries.map(({ diag, lines, start, end, }): TsVfs_ToolingResult_SemanticDiagnostic_Processed => {
+                const { category, code, messageText, length, } = diag;
+                const unwrappedMessageChain = ((): TsVfs_ToolingResult_SemanticDiagnostic_Processed_UnwrappedDiagnosticMessageChain[] => {
+                    if (typeof messageText === "string") return [{ messageText, category, code, }]; // Not sure if this ever runs, but typing suggests it might
+                    else return [...unwrapDiagnosticMessageChain(messageText)];
+                })();
+                return { code, messages: unwrappedMessageChain, start, end, length, lines, };
             });
 
             const queryResult = {
                 diagnosticsRaw,
                 diagnostics,
-                raw: raw_queryResult,
             };
 
             return {
@@ -332,23 +344,23 @@ async function main() {
 
         console.log("semantics 3 raw", result.queryResult.diagnosticsRaw);
         console.log("semantics 3", result.queryResult.diagnostics);
-        function* unwrapDiagnosticMessageChain(toUnwrap: ts.DiagnosticMessageChain) {
-            let chain: ts.DiagnosticMessageChain[] = [toUnwrap];
-            while (chain.length) {
-                const _nextChain: ts.DiagnosticMessageChain[] = [];
-                for (const diagnostic of chain) {
-                    _nextChain.push(...(diagnostic.next ?? []));
-                    delete diagnostic.next;
-                    yield diagnostic as Except<ts.DiagnosticMessageChain, "next">;
-                }
-                chain = _nextChain;
-            }
+    }
+}
+
+export type TsVfs_ToolingResult_SemanticDiagnostic_Processed_UnwrappedDiagnosticMessageChain = Except<ts.DiagnosticMessageChain, "next">;
+function* unwrapDiagnosticMessageChain(toUnwrap: ts.DiagnosticMessageChain): Generator<
+    TsVfs_ToolingResult_SemanticDiagnostic_Processed_UnwrappedDiagnosticMessageChain,
+    void,
+    unknown
+> {
+    let chain: ts.DiagnosticMessageChain[] = [toUnwrap];
+    while (chain.length) {
+        const _nextChain: ts.DiagnosticMessageChain[] = [];
+        for (const diagnostic of chain) {
+            _nextChain.push(...(diagnostic.next ?? []));
+            delete diagnostic.next;
+            yield diagnostic as Except<ts.DiagnosticMessageChain, "next">;
         }
-        const unwrapped = result.queryResult.diagnosticsRaw.flatMap((diag): Except<ts.DiagnosticMessageChain, "next">[] => {
-            const { messageText, category, code, } = diag;
-            if (typeof messageText === "string") return [{ messageText, category, code, }]; // Not sure if this ever runs, but typing suggests it might
-            else return [...unwrapDiagnosticMessageChain(messageText)];
-        });
-        console.log("unwrapped messageText", unwrapped);
+        chain = _nextChain;
     }
 }
