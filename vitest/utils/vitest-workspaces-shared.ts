@@ -3,12 +3,13 @@ import chalk from "chalk";
 import { ENV_TS_ALIASED_EXPECTED } from "../vitest";
 
 type ts = typeof import("typescript");
+export const PREFIX_TS_ALIAS = `typescript-`;
 
 export function vitestConfigWithAliasedTs(
     expectedVersion: string,
     configToMerge?: UserConfig,
 ): UserConfig {
-    const npmAlias_typescript = `typescript-${expectedVersion}` as const;
+    const npmAlias_typescript = `${PREFIX_TS_ALIAS}${expectedVersion}` as const;
 
     const config_toMerge = configToMerge ?? {};
     const config_premade: UserConfig = {

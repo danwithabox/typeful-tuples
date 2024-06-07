@@ -74,7 +74,7 @@ export function walkMaybeToNodeOf<T extends ts.Node>(walkFindFn: Parameters<type
     return (
         nodeStart: ts.Node | undefined,
         /**
-         * TODO: this is here to optionally appease `ts.visitEachChild()`, but research why is it useful
+         * TODO: this is here to optionally appease the context parameter of `ts.visitEachChild()`, but research why is it useful
          */
         context?: ts.TransformationContext,
     ) => (nodeStart !== void 0) ? walkFind<T>(nodeStart, context, walkFindFn) : void 0;

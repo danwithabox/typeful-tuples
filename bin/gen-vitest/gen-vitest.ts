@@ -1,9 +1,9 @@
 #!/usr/bin/env -S node --import=tsx/esm
 
-import pkg from "../../package.json";
-import { dirname, filename, join } from "desm";
+import type pkg from "../../package.json";
+import { join } from "desm";
 import fs from "fs-extra";
-import { globSync } from "glob";
+import { glob } from "glob";
 import { program } from "@commander-js/extra-typings";
 import { execa } from "execa";
 import ora, { type Ora } from "ora";
@@ -12,26 +12,14 @@ import type { Promisable, OverrideProperties } from "type-fest";
 import * as inquirer from "@inquirer/prompts";
 import { useVitestWorkspaceAliasHandler, type TransformRecipe_AliasedTsVersions } from "./vitest-alias-update";
 import chalk from "chalk";
+import { PREFIX_TS_ALIAS } from "../../vitest/utils/vitest-workspaces-shared";
 
-const __dirname = dirname(import.meta.url);
-const __filename = filename(import.meta.url);
 const __join = (...str: string[]) => join(import.meta.url, ...str);
 
 const PATH_DIR_TEMP = `./gen-vitest-temp/` as const;
 const PATH_DIR_ROOT = `../../` as const;
 const PATH_FILE_PACKAGE_JSON = `package.json` as const;
 const PATH_FILE_VITEST_WORKSPACE_TS = `vitest.workspace.ts` as const;
-
-/**
- * TODO: rework generation
- * ! deferring bigger ideas until experience with github actions, for now only allow easy scaffolding and removal
- *
- *  npm
- *      tags
- *          latest
- *          beta
- *          next
- */
 
 await async function main() {
     const params = program
@@ -63,7 +51,7 @@ await async function main() {
     try {
         await asyncOperation(`Creating temp folder "${PATH_DIR_TEMP}" to aid transactional file changes`, async ({ succeed, fail, }) => {
             try {
-                safeRmdir();
+                await safeRmdir();
                 await fs.mkdir(join(import.meta.url, PATH_DIR_TEMP));
                 await fs.copy(
                     join(import.meta.url, PATH_DIR_ROOT, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
@@ -122,6 +110,7 @@ await async function main() {
                 console.info(line);
             }
             console.info();
+            //#endregion
 
             const _isRecipeCacheEmpty = usingRecipeCache.isRecipeCacheEmpty();
             const _versionsAfterApply = usingRecipeCache.applyRecipeCacheToVersions(usingParsedVersions.getVersions());
@@ -279,7 +268,6 @@ await async function main() {
             const menuOption_remove = makeMenuOption_remove();
             const menuOption_add = makeMenuOption_add();
             const menuOption_update = makeMenuOption_update();
-            //#endregion
 
             menuState.inq_selection_main = await inquirer.select<Inquirer_Selection_Operations_Choices | Inquirer_Selection_Menu_Choices>({
                 message: `Choose an action:`,
@@ -404,11 +392,6 @@ await async function main() {
         const { indent_size, } = await editorconfig.parse(PATH_DIR_TEMP);
 
         await asyncOperation(`Updating temporary ${_printFileLink_packageJson} with aliased typescript packages`, async ({ succeed, fail, }) => {
-            /**
-             * TODO:
-             *  - preview and run
-             *      - commit to temp file, then wait for apply, show links to temp files
-             */
             const path_temp_package_json = __join(PATH_DIR_TEMP, PATH_FILE_PACKAGE_JSON);
 
             const _packageJson = (() => {
@@ -418,15 +401,14 @@ await async function main() {
             })();
 
             const _versionEntriesAfterApply = usingRecipeCache.applyRecipeCacheToVersions(usingParsedVersions.getVersions()).map((version): [string, string] => {
-                // TODO: extract this prefix to be common
-                const key = `typescript-${version}`;
+                const key = `${PREFIX_TS_ALIAS}${version}`;
                 const prop = `npm:typescript@${version}`;
                 return [key, prop];
             });
 
             const devDependencies = Object.fromEntries(
                 [
-                    ...Object.entries(_packageJson.devDependencies).flatMap(([key, prop]) => prop.startsWith("typescript-") ? [] : [[key, prop]]),
+                    ...Object.entries(_packageJson.devDependencies).flatMap(([key, prop]) => key.startsWith(PREFIX_TS_ALIAS) ? [] : [[key, prop]]),
                     ..._versionEntriesAfterApply,
                 ],
             );
@@ -502,7 +484,7 @@ await async function main() {
         else {
             spinner.info(`Removing temp folder "${PATH_DIR_TEMP}". Pass "--keep-temp" to keep it.`);
             try {
-                safeRmdir();
+                await safeRmdir();
             } catch (error) {
                 console.error(error);
             }
@@ -654,9 +636,9 @@ function useRecipeCache() {
 }
 
 /** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
-function safeRmdir() {
+async function safeRmdir() {
     /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
-    const globAtTempDirToAbsolute = (pattern: string | string[]) => globSync(pattern, { cwd: __join(PATH_DIR_TEMP), })
+    const globAtTempDirToAbsolute = async (pattern: string | string[]) => (await glob(pattern, { cwd: __join(PATH_DIR_TEMP), }))
         .map((globPath) => __join(PATH_DIR_TEMP, globPath))
     ;
     try {
@@ -664,11 +646,11 @@ function safeRmdir() {
             PATH_FILE_PACKAGE_JSON,
             PATH_FILE_VITEST_WORKSPACE_TS,
         ];
-        const pathsToRemove = globAtTempDirToAbsolute(globs).sort((a, b) => b.length - a.length);
+        const pathsToRemove = (await globAtTempDirToAbsolute(globs)).sort((a, b) => b.length - a.length);
 
-        for (const path of pathsToRemove) fs.statSync(path).isDirectory() ? fs.rmdirSync(path) : fs.rmSync(path);
+        for (const path of pathsToRemove) (await fs.stat(path)).isDirectory() ? await fs.rmdir(path) : await fs.rm(path);
 
-        if (fs.existsSync(__join(PATH_DIR_TEMP))) fs.rmdirSync(__join(PATH_DIR_TEMP));
+        if (await fs.exists(__join(PATH_DIR_TEMP))) await fs.rmdir(__join(PATH_DIR_TEMP));
     } catch (error) {
         throw error;
     }

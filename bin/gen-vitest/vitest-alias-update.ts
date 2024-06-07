@@ -30,7 +30,9 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
         if (file === void 0) throw new Error(`host.readFile() did not find the target file`);
 
         const fileNormalizedLF = file.replace(/\r\n/ug, "\n");
-        const encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => _ === "" ? MARKER_tsEmptyLine : _).join(`\n`);
+        const _encodedEmptyLines = fileNormalizedLF.split(`\n`).map(_ => (_ === "") ? MARKER_tsEmptyLine : _);
+        // NOTE: newline added because we want a newline after every marker, but `.join()` doesn't do that
+        const encodedEmptyLines = `${_encodedEmptyLines.join(`\n`)}\n`;
 
         const sourceFile = ts.createSourceFile(
             filePath,
@@ -38,7 +40,8 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
             tsTool.compilerOptions.target ?? ts.ScriptTarget.ESNext,
         );
         const decodeEmptyLines = (sourceFileText: string): string => {
-            const decoded = sourceFileText.split(`\n`).map(_ => _ === MARKER_tsEmptyLine ? "" : _);
+            // NOTE: `.split()` will generate an empty string as the last element due to us appending a newline above, we need to specifically remove that
+            const decoded = sourceFileText.split(`\n`).flatMap(_ => (_ === MARKER_tsEmptyLine) ? [""] : (_ === "") ? [] : _);
             const decoded_CLRF = decoded.join(EOL);
             return decoded_CLRF;
         };
@@ -108,6 +111,7 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
          */
         const printer = ts.createPrinter();
 
+        /** NOTE: .printFile() adds a new line at the end if there is none */
         const source_new = printer.printFile(transformationResult.transformed[0]);
         const source_decoded = decodeEmptyLines(source_new);
 
