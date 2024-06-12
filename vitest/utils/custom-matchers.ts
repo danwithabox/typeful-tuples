@@ -79,30 +79,6 @@ expect.extend({
                 `${utils.diff(flattenedMessages, _mapped_expected, { commonColor: (value) => chalk.gray(value), })}\n`
             ,
         };
-
-
-        // const foundIndex = flattenedMessages.findIndex((message) => {
-        //     const { code, messageText, category, } = message;
-        //     const { code: _code, messageText: _messageText, category: __category, } = _expected;
-        //     const _category = (__category === void 0) ? void 0 : DiagnosticCategory[__category];
-
-        //     const matched_code: boolean = (_code === void 0) || (code === _code);
-        //     const matched_messageText: boolean = (_messageText === void 0) || (messageText === _messageText);
-        //     const matched_category: boolean = (_category === void 0) || (category === _category);
-
-        //     return matched_code && matched_messageText && matched_category;
-        // });
-
-        // return {
-        //     pass:    foundIndex !== -1,
-        //     message: () =>
-        //         `Could not find the following result in diagnostics messages:\n\n` +
-        //         `${chalk.gray(utils.stringify(_mapped_expected, void 0, { min: true, }))}\n\n` +
-        //         `Diff with every message:\n\n` +
-        //         `${utils.diff(flattenedMessages, [_mapped_expected], { commonColor: (value) => chalk.gray(value), })}\n`
-        //     ,
-        // };
-
     },
 });
 
