@@ -1,53 +1,78 @@
 import { describe, expect, test } from "vitest";
 import { tupleOf } from "../src/index";
+import { virtualTs } from "../vitest/utils/vitest-virtual-typescript";
 
 describe(`tupleOf()`, () => {
+    const { tooling: { runQueryOnVirtualFile, }, } = virtualTs;
+
     test(`returns the input value unchanged`, () => {
         const input = [1, 2, 3];
         const output = tupleOf<(typeof input)[number]>()(input);
 
         expect(output).toEqual(input);
     });
+
     describe(`developer experience`, () => {
         describe(`expected feedback in IDE`, () => {
-            test(`diagnostics result, when tuple element 0 is empty string: Type '""' is not assignable to type 'Allowed'.`, () => {
-                // TODO: I don't like this, can't use it outside in a describe block or anywhere that's not inside a test, for that matter, too many repeats
-                const { sourceFiles: sf, virtualTs, } = globalThis;
-                const { tooling: { runQueryOnVirtualFile, }, } = virtualTs;
 
-                const result = runQueryOnVirtualFile.getSemanticDiagnostics(sf["../index.ts"], ({ $l, $imports, }) => /* ts */`
+            test(`diagnostics result, when provided tuple is ["foo", ""]: Type '""' is not assignable to type 'Allowed'.`, () => {
+                const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
                     import { tupleOf } from "${$imports["./src/index"]}";
-                    type Allowed = "1" | "2" | "3";
-                    tupleOf<Allowed>()(["1", ""]);${$l}
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", ""]);${$l}
                 `);
 
-                const diagnostic = result.queryResult.diagnostics.at(0);
-                if (diagnostic === void 0) throw new Error("Expected a diagnostic error, but got none");
-
-                // function messageMatcher() {}
-                const message = diagnostic.messages.at(0);
-                if (message === void 0) throw new Error("Expected a diagnostic message, but got none");
-                expect(message.code).toBe(2322);
-                expect(message.messageText).toBe(`Type '""' is not assignable to type 'Allowed'.`);
+                expect(result).toHaveSemanticDiagnostics([{
+                    category:    "Error",
+                    code:        2322,
+                    messageText: `Type '""' is not assignable to type 'Allowed'.`,
+                }]);
             });
-            test(`autocomplete result, when tuple element 0 is empty string: ["1", "2", "3"]`, () => {
-                // TODO: I don't like this, can't use it outside in a describe block or anywhere that's not inside a test, for that matter, too many repeats
-                const { sourceFiles: sf, virtualTs, } = globalThis;
-                const { tooling: { runQueryOnVirtualFile, }, } = virtualTs;
 
-                const result = runQueryOnVirtualFile.getCompletionsAtPosition(sf["../index.ts"], ({ $c, $imports, }) => /* ts */`
+            test(`autocomplete result, when provided tuple is ["foo", ""]: ["foo", "bar", "baz"]`, () => {
+                const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
                     import { tupleOf } from "${$imports["./src/index"]}";
-                    type Allowed = "1" | "2" | "3";
-                    tupleOf<Allowed>()(["1", "${$c}"]);
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "${$c}"]);
                 `);
 
-                expect(result.queryResult.entriesNames).to.include.members(["1", "2", "3"]);
+                expect(result).toHaveCompletions(["foo", "bar", "baz"]);
             });
-            type Allowed = "1" | "2" | "3";
-            // tupleOf<Allowed>()(["1"]);
-            // tupleOf<Allowed>()(["1", ""]);
-            // tupleOf<Allowed>()(["1", "1", ""]);
-            // tupleOf<Allowed>()(["1", "2", ""]);
+
+            test(`autocomplete result, when provided tuple is ["foo", "foo", ""]: ["foo", "bar", "baz"]`, () => {
+                const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
+                    import { tupleOf } from "${$imports["./src/index"]}";
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "foo", "${$c}"]);
+                `);
+
+                expect(result).toHaveCompletions(["foo", "bar", "baz"]);
+            });
+
+            test(`autocomplete result, when provided tuple is ["foo", "bar", ""]: ["foo", "bar", "baz"]`, () => {
+                const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
+                    import { tupleOf } from "${$imports["./src/index"]}";
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "bar", "${$c}"]);
+                `);
+
+                expect(result).toHaveCompletions(["foo", "bar", "baz"]);
+            });
+
+            test(`autocomplete result, when provided tuple is ["foo", "bar", "baz", ""]: ["foo", "bar", "baz"]`, () => {
+                const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
+                    import { tupleOf } from "${$imports["./src/index"]}";
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "bar", "baz", "${$c}"]);
+                `);
+
+                expect(result).toHaveCompletions(["foo", "bar", "baz"]);
+            });
         });
     });
 });

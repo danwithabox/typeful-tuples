@@ -1,18 +1,18 @@
-import { mergeConfig, type UserConfig } from "vite";
+import { mergeConfig, type UserWorkspaceConfig } from "vitest/config";
 import chalk from "chalk";
 import { ENV_TS_ALIASED_EXPECTED } from "../vitest";
 
 type ts = typeof import("typescript");
 export const PREFIX_TS_ALIAS = `typescript-`;
 
-export function vitestConfigWithAliasedTs(
+export function vitestWorkspaceConfigWithAliasedTs(
     expectedVersion: string,
-    configToMerge?: UserConfig,
-): UserConfig {
+    configToMerge?: UserWorkspaceConfig,
+): UserWorkspaceConfig {
     const npmAlias_typescript = `${PREFIX_TS_ALIAS}${expectedVersion}` as const;
 
     const config_toMerge = configToMerge ?? {};
-    const config_premade: UserConfig = {
+    const config_premade: UserWorkspaceConfig = {
         test: {
             name:        `typescript@${expectedVersion}`,
             root:        `./test`, // This is relative to the specific `vitest.config.ts` file this is used in
@@ -27,8 +27,8 @@ export function vitestConfigWithAliasedTs(
                 setupFiles: "list",
             },
             typecheck: {
-                // enabled: true,
-                // only:    false,
+                enabled: true,
+                only:    false,
             },
             env: {
                 [ENV_TS_ALIASED_EXPECTED]: expectedVersion,
