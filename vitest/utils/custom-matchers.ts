@@ -59,6 +59,7 @@ expect.extend({
          * TODO: so, overall, future considerations:
          *  - flatten everything into a 1 dimensional array for easier assertions
          *  - parameterized markers, where the parameter is shown in the given result message: this would help to identify unwrapped messages and lines without line numbers
+         *      - or, maybe, line markers are useless? I don't seem to use them a lot
          *  - include line numbers too
          *  - include substrings of what is squiggled
          *  - allow partial matching somehow (expect.anything() didn't work )

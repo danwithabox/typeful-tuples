@@ -11,7 +11,6 @@ describe(`tupleExhaustiveOf()`, () => {
     });
 
     describe(`IDE / language server developer experience`, () => {
-        const { sourceFiles: sf, virtualTs, } = globalThis;
 
         test(`autocomplete shows the correct options`, () => {
 

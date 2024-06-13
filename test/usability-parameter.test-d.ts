@@ -49,7 +49,7 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_TArr(tuple(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
@@ -83,7 +83,7 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_const_TArr(tuple(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
@@ -99,83 +99,6 @@ describe(`not losing inference in function parameter location`, () => {
                 );
             }
         });
-        test(`with inference boxing / unboxing`, () => {
-            {
-                const output = inferenceSourceFn(tuple.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn(
-                    tuple.box(["1", "2", "2"]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_T(tuple.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"" | "1" | "2"' is not assignable to type 'Allowed'.ts(2345)
-                    tuple.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_T(
-                    tuple.box(["1", "2", "2"]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"1" | "2" | "4"' is not assignable to type 'Allowed'.ts(2345)
-                    tuple.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_TArr(tuple.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_TArr(
-                    tuple.box(["1", "2", "2"]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_T(tuple.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_T(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_T(
-                    tuple.box(["1", "2", "2"]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_T(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_TArr(tuple.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tuple.box(["1", "2", "2"]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tuple.box(["1", "2", "4"]).unbox,
-                );
-            }
-        });
     });
     describe(`when using tupleUnique()`, () => {
         test(`control group - without any workarounds`, () => {
@@ -188,7 +111,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUnique(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUnique(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn(
@@ -205,7 +128,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUnique(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn_T(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUnique(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_T(
@@ -215,14 +138,14 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_TArr(tupleUnique(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
                     tupleUnique(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn_TArr(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUnique(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_TArr(
@@ -239,7 +162,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUnique(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn_const_T(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUnique(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_T(
@@ -249,111 +172,19 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_const_TArr(tupleUnique(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
                     tupleUnique(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUnique(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Argument of type '("1" | "2" | "4")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
                     tupleUnique(["1", "2", "4"]),
-                );
-            }
-        });
-        test(`with inference boxing / unboxing`, () => {
-            {
-                const output = inferenceSourceFn(tupleUnique.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn(
-                    //@ts-expect-error Type '"" | "1" | "2"' is not assignable to type 'Allowed'.ts(2345)
-                    tupleUnique.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn(
-                    tupleUnique.box(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn(
-                    //@ts-expect-error Type '"1" | "2" | "4"' is not assignable to type 'Allowed'.ts(2345)
-                    tupleUnique.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_T(tupleUnique.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"" | "1" | "2"' is not assignable to type 'Allowed'.ts(2345)
-                    tupleUnique.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_T(
-                    tupleUnique.box(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_T(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_TArr(tupleUnique.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_TArr(
-                    tupleUnique.box(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_T(tupleUnique.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_T(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_T(
-                    tupleUnique.box(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_T(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_TArr(tupleUnique.box(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", ""]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUnique.box(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Argument of type '["1", "2", "4"]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
-                    tupleUnique.box(["1", "2", "4"]).unbox,
                 );
             }
         });
@@ -388,7 +219,7 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_TArr(tupleOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_TArr(
                     //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
@@ -414,7 +245,7 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_const_TArr(tupleOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
@@ -423,68 +254,6 @@ describe(`not losing inference in function parameter location`, () => {
                 const output_fail_disallowed = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
                     tupleOf<Allowed>()(["1", "2", "4"]),
-                );
-            }
-        });
-        test(`with inference boxing / unboxing`, () => {
-            {
-                const output = inferenceSourceFn(tupleOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_T(tupleOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_T(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_TArr(tupleOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_T(tupleOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_TArr(tupleOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleOf.box<Allowed>()(["1", "2", "4"]).unbox,
                 );
             }
         });
@@ -500,7 +269,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUniqueOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn(
@@ -517,7 +286,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUniqueOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_T(
@@ -527,14 +296,14 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_TArr(tupleUniqueOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_TArr(
                     //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_TArr(
@@ -551,7 +320,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleUniqueOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_T(
@@ -561,111 +330,19 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_const_TArr(tupleUniqueOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
                     tupleUniqueOf<Allowed>()(["1", "2", "4"]),
-                );
-            }
-        });
-        test(`with inference boxing / unboxing`, () => {
-            {
-                const output = inferenceSourceFn(tupleUniqueOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUniqueOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_T(tupleUniqueOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_T(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUniqueOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_TArr(tupleUniqueOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUniqueOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_T(tupleUniqueOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUniqueOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_TArr(tupleUniqueOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleUniqueOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type 'Allowed'.ts(2322)
-                    tupleUniqueOf.box<Allowed>()(["1", "2", "4"]).unbox,
                 );
             }
         });
@@ -681,7 +358,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleExhaustiveOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleExhaustiveOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn(
@@ -698,7 +375,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleExhaustiveOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleExhaustiveOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_T(
@@ -708,14 +385,14 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_TArr(tupleExhaustiveOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
                     tupleExhaustiveOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleExhaustiveOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_TArr(
@@ -732,7 +409,7 @@ describe(`not losing inference in function parameter location`, () => {
                     tupleExhaustiveOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleExhaustiveOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_T(
@@ -742,14 +419,14 @@ describe(`not losing inference in function parameter location`, () => {
             }
             {
                 const output = inferenceSourceFn_const_TArr(tupleExhaustiveOf<Allowed>()(["1", "2", "3"]));
-                expectTypeOf(output).toEqualTypeOf<("1" | "2" | "3")[]>();
+                expectTypeOf(output).toEqualTypeOf<["1", "2", "3"]>();
 
                 const output_fail_empty = inferenceSourceFn_const_TArr(
                     //@ts-expect-error Argument of type '("" | "1" | "2")[]' is not assignable to parameter of type 'Allowed[]'.ts(2345)
                     tupleExhaustiveOf<Allowed>()(["1", "2", ""]),
                 );
                 const output_fail_invalid = inferenceSourceFn(
-                    // Expected issue: this doesn't show an error
+                    //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
                     tupleExhaustiveOf<Allowed>()(["1", "2", "2"]),
                 );
                 const output_fail_disallowed = inferenceSourceFn_const_TArr(
@@ -758,97 +435,6 @@ describe(`not losing inference in function parameter location`, () => {
                 );
             }
         });
-        test(`with inference boxing / unboxing`, () => {
-            {
-                const output = inferenceSourceFn(tupleExhaustiveOf.box<Allowed>()(["1", "2", "3"]).unbox);
 
-                const output_fail_empty = inferenceSourceFn(
-                    //@ts-expect-error Type '""' is not assignable to type '"3"'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn(
-                    //@ts-expect-error Type '"4"' is not assignable to type '"" | Allowed'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_T(tupleExhaustiveOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_T(
-                    //@ts-expect-error Type '""' is not assignable to type '"3"'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type '"" | Allowed'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_TArr(tupleExhaustiveOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type '"3"'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type '"" | Allowed'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_T(tupleExhaustiveOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '""' is not assignable to type '"3"'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_T(
-                    //@ts-expect-error Type '"4"' is not assignable to type '"" | Allowed'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-            {
-                const output = inferenceSourceFn_const_TArr(tupleExhaustiveOf.box<Allowed>()(["1", "2", "3"]).unbox);
-
-                const output_fail_empty = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '""' is not assignable to type '"3"'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", ""]).unbox,
-                );
-                const output_fail_invalid = inferenceSourceFn_const_TArr(
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2",
-                        //@ts-expect-error Type 'string' is not assignable to type 'never'.ts(2322)
-                        "2",
-                    ]).unbox,
-                );
-                const output_fail_disallowed = inferenceSourceFn_const_TArr(
-                    //@ts-expect-error Type '"4"' is not assignable to type '"" | Allowed'.ts(2322)
-                    tupleExhaustiveOf.box<Allowed>()(["1", "2", "4"]).unbox,
-                );
-            }
-        });
     });
 });

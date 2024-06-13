@@ -29,11 +29,8 @@ test(`inference doesn't break when using "tuple()" as props in "Record<Keys, any
         bar: tuple(["1", "2", "2"]),
         baz: tuple(["1", "2", "3"]),
     } satisfies Record<Keys, unknown[]>;
-    expectTypeOf(record_1).not.toEqualTypeOf<Correct>();
+    expectTypeOf(record_1).toEqualTypeOf<Correct>();
 });
-
-
-const asd = tupleUnique(["1", "2", "2"]);
 
 test(`inference doesn't break when using "tupleUnique()" as props in "Record<Keys, any>", "Record<Keys, unknown>", but breaks with "Record<Keys, unknown[]>"`, () => {
     const record_0_any = {
@@ -59,10 +56,11 @@ test(`inference doesn't break when using "tupleUnique()" as props in "Record<Key
 
     const record_1 = {
         foo: tupleUnique(["1"]),
+        // @ts-expect-error correctly invalid tuple
         bar: tupleUnique(["1", "2", "2"]),
         baz: tupleUnique(["1", "2", "3"]),
     } satisfies Record<Keys, unknown[]>;
-    expectTypeOf(record_1).not.toEqualTypeOf<Correct>();
+    expectTypeOf(record_1).toEqualTypeOf<Correct>();
 });
 
 test(`inference doesn't break when using "tupleOf()" as props in "Record<Keys, any>", "Record<Keys, unknown>", but breaks with "Record<Keys, unknown[]>"`, () => {
@@ -149,9 +147,9 @@ test(`inference doesn't break when using "tupleUniqueOf()" as props in "Record<K
     expectTypeOf(record_2).not.toEqualTypeOf<Correct>();
     const record_3 = {
         foo: values(["1"]),
-        // should be an error, but correctly breaks due to "unknown[]" instead of "unknown"
+        // @ts-expect-error correctly invalid tuple
         bar: values(["1", "2", "2"]),
-        // should be an error, but correctly breaks due to "unknown[]" instead of "unknown"
+        // @ts-expect-error correctly invalid tuple
         baz: values(["1", "2", ""]),
     } satisfies Record<Keys, unknown[]>;
     expectTypeOf(record_3).not.toEqualTypeOf<Correct>();
@@ -196,11 +194,11 @@ test(`inference doesn't break when using "tupleExhaustiveOf()" as props in "Reco
     } satisfies Record<Keys, unknown>;
     expectTypeOf(record_2).not.toEqualTypeOf<Correct>();
     const record_3 = {
-        // should be an error, but correctly breaks due to "unknown[]" instead of "unknown"
+        // @ts-expect-error correctly invalid tuple
         foo: values(["1"]),
-        // should be an error, but correctly breaks due to "unknown[]" instead of "unknown"
+        // @ts-expect-error correctly invalid tuple
         bar: values(["1", "2", "2"]),
-        // should be an error, but correctly breaks due to "unknown[]" instead of "unknown"
+        // @ts-expect-error correctly invalid tuple
         baz: values(["1", "2", ""]),
     } satisfies Record<Keys, unknown[]>;
     expectTypeOf(record_3).not.toEqualTypeOf<Correct>();
