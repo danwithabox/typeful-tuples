@@ -13,14 +13,18 @@ describe(`tuple()`, () => {
 
     describe(`developer experience, expected feedback in IDE`, () => {
 
-        test(`diagnostics result, when provided tuple is \`["foo", "foo"]\`: there is no error, due to deliberately not having a uniqueness check`, () => {
-            const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
-                import { tuple } from "${$imports["./src/index"]}";
+        describe(`uniqueness checks`, () => {
 
-                tuple(["foo", "foo"]);${$l}
-            `);
+            test(`diagnostics result, when provided non-unique tuple is \`["foo", "foo"]\`: there is no error, due to deliberately not having a uniqueness check`, () => {
+                const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
+                    import { tuple } from "${$imports["./src/index"]}";
 
-            expect(result).toHaveSemanticDiagnostics([]);
+                    tuple(["foo", "foo"]);
+                `);
+
+                expect(result).toHaveSemanticDiagnostics([]);
+            });
+
         });
 
     });

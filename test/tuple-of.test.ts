@@ -18,13 +18,14 @@ describe(`tupleOf()`, () => {
                 import { tupleOf } from "${$imports["./src/index"]}";
 
                 type Allowed = "foo" | "bar" | "baz";
-                tupleOf<Allowed>()(["foo", ""]);${$l}
+                tupleOf<Allowed>()(["foo", ""]);
             `);
 
             expect(result).toHaveSemanticDiagnostics([{
                 category:    "Error",
                 code:        2322,
                 messageText: `Type '""' is not assignable to type 'Allowed'.`,
+                lines:       [4],
             }]);
         });
 
@@ -33,13 +34,14 @@ describe(`tupleOf()`, () => {
                 import { tupleOf } from "${$imports["./src/index"]}";
 
                 type Allowed = "foo" | "bar" | "baz";
-                tupleOf<Allowed>()(["foo", "err"]);${$l}
+                tupleOf<Allowed>()(["foo", "err"]);
             `);
 
             expect(result).toHaveSemanticDiagnostics([{
                 category:    "Error",
                 code:        2322,
                 messageText: `Type '"err"' is not assignable to type 'Allowed'.`,
+                lines:       [4],
             }]);
         });
 
@@ -49,7 +51,7 @@ describe(`tupleOf()`, () => {
 
                 type Allowed = "foo" | "bar" | "baz";
                 const input = ["foo", "err"] as const;
-                tupleOf<Allowed>()(input);${$l}
+                tupleOf<Allowed>()(input);
             `);
 
             expect(result).toHaveSemanticDiagnostics([
@@ -57,26 +59,30 @@ describe(`tupleOf()`, () => {
                     category:    "Error",
                     code:        2345,
                     messageText: `Argument of type 'readonly ["foo", "err"]' is not assignable to parameter of type 'readonly Allowed[]'.`,
+                    lines:       [5],
                 },
                 {
                     category:    "Error",
                     code:        2322,
                     messageText: `Type '"foo" | "err"' is not assignable to type 'Allowed'.`,
+                    lines:       [5],
                 },
                 {
                     category:    "Error",
                     code:        2322,
                     messageText: `Type '"err"' is not assignable to type 'Allowed'.`,
+                    lines:       [5],
                 },
             ]);
         });
+
         test(`diagnostics result, when provided variable is \`const input = ["foo", "err"]\`: Type 'string' is not assignable to type 'Allowed'.`, () => {
             const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
                 import { tupleOf } from "${$imports["./src/index"]}";
 
                 type Allowed = "foo" | "bar" | "baz";
                 const input = ["foo", "err"];
-                tupleOf<Allowed>()(input);${$l}
+                tupleOf<Allowed>()(input);
             `);
 
             expect(result).toHaveSemanticDiagnostics([
@@ -84,24 +90,15 @@ describe(`tupleOf()`, () => {
                     category:    "Error",
                     code:        2345,
                     messageText: `Argument of type 'string[]' is not assignable to parameter of type 'readonly Allowed[]'.`,
+                    lines:       [5],
                 },
                 {
                     category:    "Error",
                     code:        2322,
                     messageText: `Type 'string' is not assignable to type 'Allowed'.`,
+                    lines:       [5],
                 },
             ]);
-        });
-
-        test(`diagnostics result, when provided tuple is \`["foo", "foo"]\`: there is no error, due to deliberately not having a uniqueness check`, () => {
-            const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
-                import { tupleOf } from "${$imports["./src/index"]}";
-
-                type Allowed = "foo" | "bar" | "baz";
-                tupleOf<Allowed>()(["foo", "foo"]);${$l}
-            `);
-
-            expect(result).toHaveSemanticDiagnostics([]);
         });
 
         test(`autocomplete result, when provided tuple is \`["foo", ""]\`: ["foo", "bar", "baz"]`, () => {
@@ -110,17 +107,6 @@ describe(`tupleOf()`, () => {
 
                 type Allowed = "foo" | "bar" | "baz";
                 tupleOf<Allowed>()(["foo", "${$c}"]);
-            `);
-
-            expect(result).toHaveCompletions(["foo", "bar", "baz"]);
-        });
-
-        test(`autocomplete result, when provided tuple is \`["foo", "foo", ""]\`: ["foo", "bar", "baz"]`, () => {
-            const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
-                import { tupleOf } from "${$imports["./src/index"]}";
-
-                type Allowed = "foo" | "bar" | "baz";
-                tupleOf<Allowed>()(["foo", "foo", "${$c}"]);
             `);
 
             expect(result).toHaveCompletions(["foo", "bar", "baz"]);
@@ -146,6 +132,32 @@ describe(`tupleOf()`, () => {
             `);
 
             expect(result).toHaveCompletions(["foo", "bar", "baz"]);
+        });
+
+        describe(`uniqueness checks`, () => {
+
+            test(`diagnostics result, when provided non-unique tuple is \`["foo", "foo"]\`: there is no error, due to deliberately not having a uniqueness check`, () => {
+                const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
+                    import { tupleOf } from "${$imports["./src/index"]}";
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "foo"]);
+                `);
+
+                expect(result).toHaveSemanticDiagnostics([]);
+            });
+
+            test(`autocomplete result, when provided non-unique tuple is \`["foo", "foo", ""]\`: ["foo", "bar", "baz"]`, () => {
+                const result = runQueryOnVirtualFile.getCompletionsAtPosition("../index.ts", ({ $c, $imports, }) => /* ts */`
+                    import { tupleOf } from "${$imports["./src/index"]}";
+
+                    type Allowed = "foo" | "bar" | "baz";
+                    tupleOf<Allowed>()(["foo", "foo", "${$c}"]);
+                `);
+
+                expect(result).toHaveCompletions(["foo", "bar", "baz"]);
+            });
+
         });
 
     });

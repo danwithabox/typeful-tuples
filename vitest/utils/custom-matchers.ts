@@ -2,7 +2,7 @@ import { expect } from "vitest";
 import { is_TsVfs_ToolingResult_getCompletionsAtPosition, is_TsVfs_ToolingResult_getSemanticDiagnostics, type TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_UnwrappedDiagnosticMessageChain } from "./ts-vfs/ts-vfs";
 import chalk from "chalk";
 import { DiagnosticCategory } from "typescript";
-import type { OverrideProperties } from "type-fest";
+import type { Merge, OverrideProperties } from "type-fest";
 
 // TODO: rewrite to chai plugin to allow detecting chaining, don't handle `this.isNot` until then - https://www.chaijs.com/guide/plugins/
 expect.extend({
@@ -41,11 +41,10 @@ expect.extend({
     },
     toHaveSemanticDiagnostics(received, expected) {
         const _expected = expected as TsVfs_toIncludeSemanticDiagnostic_param;
-        const _mapped_expected: Partial<TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_UnwrappedDiagnosticMessageChain>[] = _expected.map(value => {
+        const _mapped_expected: TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_WithLines[] = _expected.map(value => {
             return {
-                code:        (value.code === void 0) ? void 0 : value.code,
-                messageText: (value.messageText === void 0) ? void 0 : value.messageText,
-                category:    (value.category === void 0) ? void 0 : DiagnosticCategory[value.category],
+                ...value,
+                category: DiagnosticCategory[value.category],
             };
         });
         const { isNot, utils, } = this;
@@ -55,8 +54,21 @@ expect.extend({
             message: () => `${utils.stringify(received, void 0, { min: true, theme: {  }, })} is${isNot ? "" : " not"} a result of "getSemanticDiagnostics()"\n`,
         };
 
-        // TODO: this is why (:rework-flatten-processed-diag) might be nicer
-        const flattenedMessages = received.queryResult.diagnostics.flatMap(diag => diag.messages);
+        // TODO: this is why (:rework-flatten-processed-diag) might be nicer, also, line numbers are not obvious where they belong, currently, and consider returning substrings too
+        /**
+         * TODO: so, overall, future considerations:
+         *  - flatten everything into a 1 dimensional array for easier assertions
+         *  - parameterized markers, where the parameter is shown in the given result message: this would help to identify unwrapped messages and lines without line numbers
+         *  - include line numbers too
+         *  - include substrings of what is squiggled
+         *  - allow partial matching somehow (expect.anything() didn't work )
+         */
+        const flattenedMessages = received.queryResult.diagnostics.flatMap(diag => {
+            const { lines, } = diag;
+            return diag.messages.map(message => {
+                return { ...message, lines, };
+            });
+        });
 
         const result = ((): { pass: true, } | { pass: false, errorMessage: string, } => {
             try {
@@ -92,12 +104,20 @@ type DiagnosticCategoryKey<T extends DiagnosticCategory = DiagnosticCategory> = 
         [DiagnosticCategory.Message]:    "Message",
     }[E]
 }[T];
-type TsVfs_toIncludeSemanticDiagnostic_param = Array<Partial<OverrideProperties<
+type TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_WithLines = Merge<
     TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_UnwrappedDiagnosticMessageChain,
     {
-        category: DiagnosticCategoryKey,
+        lines: number[],
     }
->>>;
+>;
+type TsVfs_toIncludeSemanticDiagnostic_param = Array<
+    OverrideProperties<
+        TsVfs_ToolingResult_getSemanticDiagnostics_SemanticDiagnostic_WithLines,
+        {
+            category: DiagnosticCategoryKey,
+        }
+    >
+>;
 
 interface CustomMatchers<R = unknown> {
     toHaveCompletions:         (completions: TsVfs_toHaveCompletions_param) => R,
