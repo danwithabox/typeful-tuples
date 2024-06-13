@@ -1,9 +1,27 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { tuple } from "../src/index";
+import { virtualTs } from "../vitest/utils/vitest-virtual-typescript";
 
-test(`tuple() returns the input value unchanged`, () => {
-    const input = [1, 2, 3];
-    const output = tuple(input);
+describe(`tuple()`, () => {
+    const { tooling: { runQueryOnVirtualFile, }, } = virtualTs;
 
-    expect(output).toEqual(input);
+    test(`returns the input value unchanged`, () => {
+        const input = [1, 2, 3];
+        const output = tuple(input);
+        expect(output).toEqual(input);
+    });
+
+    describe(`developer experience, expected feedback in IDE`, () => {
+
+        test(`diagnostics result, when provided tuple is \`["foo", "foo"]\`: there is no error, due to deliberately not having a uniqueness check`, () => {
+            const result = runQueryOnVirtualFile.getSemanticDiagnostics("../index.ts", ({ $l, $imports, }) => /* ts */`
+                import { tuple } from "${$imports["./src/index"]}";
+
+                tuple(["foo", "foo"]);${$l}
+            `);
+
+            expect(result).toHaveSemanticDiagnostics([]);
+        });
+
+    });
 });
