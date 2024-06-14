@@ -8,6 +8,12 @@ test(`tupleOf() returns the input unchanged, non-const literal`, () => {
     expectTypeOf(output).toEqualTypeOf<["foo"]>();
 });
 
+test(`tuple() returns the input unchanged, non-const variable`, () => {
+    const input: Allowed[] = ["foo"];
+    const output = tupleOf<Allowed>()(input);
+    expectTypeOf(output).toEqualTypeOf<Allowed[]>();
+});
+
 test(`tupleOf() returns the input unchanged, as const literal`, () => {
     const output = tupleOf<Allowed>()(["foo"] as const);
     expectTypeOf(output).toEqualTypeOf<readonly ["foo"]>();
