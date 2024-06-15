@@ -1,4 +1,4 @@
-// TODO: allow NaN and symbols and whatever else such values which are distinct but lack a distinct type, to be used, maybe type-fest alreadt has an util
+// TODO: allow NaN and symbols and whatever else such values which are distinct but lack a distinct type, to be used, maybe type-fest already has an util
 // describe(`types that require a transformation into an opaque type to produce expected behaviour`, () => {
 //     test(`unique symbols work`, () => {
 //         const sym1 = Symbol("sym1");

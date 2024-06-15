@@ -136,6 +136,12 @@ export function createVirtualTs<const TSourceFiles extends VirtualFiles_Transfor
     if (program === void 0) throw new Error(`[createVirtualTs] getProgram() somehow returned undefined.`);
     const typeChecker = program.getTypeChecker();
 
+    function upsertSourceFile(fileName: string, content: string) {
+        const doesFileExist = vfs.env.getSourceFile(fileName) !== void 0;
+        if (doesFileExist) vfs.env.updateFile(fileName, content);
+        else vfs.env.createFile(fileName, content);
+    }
+
     const { tooling, } = (function createTooling(params: { vfsEnv: VirtualTypeScriptEnvironment, }) {
         const { vfsEnv, } = params;
 
@@ -167,11 +173,6 @@ export function createVirtualTs<const TSourceFiles extends VirtualFiles_Transfor
             if (index === -1) return [rawContent, null] as const;
             return [rawContent.replace(_markers[marker], ""), index] as const;
         }
-        function upsertSourceFile(fileName: string, content: string) {
-            const doesFileExist = vfsEnv.getSourceFile(fileName) !== void 0;
-            if (doesFileExist) vfsEnv.updateFile(fileName, content);
-            else vfsEnv.createFile(fileName, content);
-        }
 
         function getCompletionsAtPosition<K extends keyof TSourceFiles>(
             sourceFileEntry: K,
@@ -188,6 +189,7 @@ export function createVirtualTs<const TSourceFiles extends VirtualFiles_Transfor
             const raw_queryResult: ts.WithMetadata<ts.CompletionInfo> | undefined = (() => {
                 if (position === null) return;
                 const queryResult = vfsEnv.languageService.getCompletionsAtPosition(fileName, position, options);
+                // TODO: check what useful stuff getCompletionEntryDetails() can provide, maybe related to (:rework-flatten-processed-diag)
                 return queryResult;
             })();
 
@@ -293,6 +295,10 @@ export function createVirtualTs<const TSourceFiles extends VirtualFiles_Transfor
         program,
         typeChecker,
         tooling,
+        sourceFiles: {
+            sourceFiles,
+            upsertSourceFile,
+        },
     } as const;
 }
 
@@ -311,5 +317,59 @@ function* unwrapDiagnosticMessageChain(toUnwrap: ts.DiagnosticMessageChain): Gen
             yield diagnostic as Except<ts.DiagnosticMessageChain, "next">;
         }
         chain = _nextChain;
+    }
+}
+
+import { join } from "desm";
+import { defineVirtualSourceFiles } from "./virtualized-files";
+import { walkTransform } from "./walk";
+// await main();
+async function main() {
+    const absoluteProjectRoot = join(import.meta.url, `../../../`);
+
+    const sourceFiles = defineVirtualSourceFiles([
+        { path: `../index.ts`, imports: [`./src/index.js`], },
+        // { path: `../index2.ts`, imports: [`./src/index2.js`, `..src/index3.js`], },
+    ]);
+
+    const {
+        vfs,
+        tooling: {
+            runQueryOnVirtualFile,
+        },
+        typeChecker,
+    } = createVirtualTs({
+        projectRootPath: absoluteProjectRoot,
+        sourceFiles,
+    });
+
+    {
+        function upsertSourceFile(fileName: string, content: string) {
+            const doesFileExist = vfs.env.getSourceFile(fileName) !== void 0;
+            if (doesFileExist) vfs.env.updateFile(fileName, content);
+            else vfs.env.createFile(fileName, content);
+        }
+        upsertSourceFile(
+            sourceFiles["../index.ts"].path,
+            /* ts */`const myType = 1234 as const;`,
+        );
+        const myType = 1234 as const;
+        const quickInfo = vfs.env.languageService.getQuickInfoAtPosition(
+            sourceFiles["../index.ts"].path,
+            7,
+        );
+        console.log(`quickInfo`, quickInfo);
+
+        const _source = vfs.env.getSourceFile(sourceFiles["../index.ts"].path);
+        if (_source === void 0) throw new Error("no source");
+        walkTransform(_source, void 0, (node) => {
+            console.log(node.getFullStart());
+            if ((5 <= node.pos) && (node.pos <= 13)) {
+                const typeAtLocation = typeChecker.getTypeAtLocation(node);
+                if (typeAtLocation.isNumberLiteral()) {
+                    console.log("typeAtLocation", typeAtLocation.value);
+                }
+            }
+        });
     }
 }
