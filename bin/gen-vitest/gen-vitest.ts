@@ -41,7 +41,6 @@ await async function main() {
     const spinner = ora();
     const { asyncOperation, } = useAsyncOperation(spinner);
 
-
     const Inquirer_Selection_Operations_Choices = [`add`, `remove`, `update`] as const;
     type Inquirer_Selection_Operations_Choices = (typeof Inquirer_Selection_Operations_Choices)[number];
 

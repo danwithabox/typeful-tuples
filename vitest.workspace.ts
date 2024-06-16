@@ -14,12 +14,11 @@ import { vitestWorkspaceConfigWithAliasedTs } from "./vitest/utils/vitest-worksp
  */
 
 export default defineWorkspace([
+    vitestWorkspaceConfigWithAliasedTs("5.5.1-rc"),
     vitestWorkspaceConfigWithAliasedTs(`5.5.0-beta`, {
-        test: {
-        },
+        test: {},
     }),
     vitestWorkspaceConfigWithAliasedTs("5.4.5", {
-        test: {
-        },
+        test: {},
     }),
 ]);

@@ -5,8 +5,8 @@ import { ESLint } from "eslint";
 import { EOL } from "node:os";
 
 const CORRECT_IDENTIFIERS = {
-    "defineWorkspace":           "defineWorkspace",
-    "vitestConfigWithAliasedTs": "vitestConfigWithAliasedTs",
+    "defineWorkspace":                    "defineWorkspace",
+    "vitestWorkspaceConfigWithAliasedTs": "vitestWorkspaceConfigWithAliasedTs",
 } as const;
 
 export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspacefilePath, }: {
@@ -169,7 +169,7 @@ function transformWalkResultWithRecipe(
             console.warn(`Skipped adding specified version "${version}": version already exists in vitest.workspace.ts`);
             continue;
         }
-        const created = create_vitestConfigWithAliasedTs(version);
+        const created = create_vitestWorkspaceConfigWithAliasedTs(version);
         _walkResult.push(created);
     }
     for (const { from: version, to: to_version, } of _r_update) {
@@ -178,7 +178,7 @@ function transformWalkResultWithRecipe(
             console.warn(`Skipped updating specified version "${version}": version does not exist in vitest.workspace.ts`);
             continue;
         }
-        const created = create_vitestConfigWithAliasedTs(to_version, checked.found.cloneNodeOfArrayElement);
+        const created = create_vitestWorkspaceConfigWithAliasedTs(to_version, checked.found.cloneNodeOfArrayElement);
         _walkResult.splice(checked.index, 1, created);
     }
 
@@ -196,14 +196,17 @@ function interpretAst_workspaceArray_versions(node_array: ts.ArrayLiteralExpress
             default: return;
         }
     };
+    let wasCorrectIdentifierFound_vitestWorkspaceConfigWithAliasedTs = false;
     const versions = node_array.elements.flatMap((element) => {
         if (ts.isCallExpression(element)) {
-            if ((ts.isIdentifier(element.expression)) && (element.expression.escapedText === CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs)) {
+            if ((ts.isIdentifier(element.expression)) && (element.expression.escapedText === CORRECT_IDENTIFIERS.vitestWorkspaceConfigWithAliasedTs)) {
+                wasCorrectIdentifierFound_vitestWorkspaceConfigWithAliasedTs = true;
+
                 const [arg_versionExpression, ...arg_rest] = element.arguments;
                 const text = matchValidExpressionText(arg_versionExpression);
                 if (text === void 0) throw new Error(
                     "Invalid string expression in place of version string, please only use string literals and no-substitution template literals " +
-                    `for the parameter of "${CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs}"`,
+                    `for the parameter of "${CORRECT_IDENTIFIERS.vitestWorkspaceConfigWithAliasedTs}"`,
                 );
                 const cloneNodeOfArrayElement = ts.factory.updateCallExpression(element, element.expression, void 0, element.arguments);
                 return [{ textOfVersion: text, cloneNodeOfArrayElement, }];
@@ -211,10 +214,11 @@ function interpretAst_workspaceArray_versions(node_array: ts.ArrayLiteralExpress
         }
         return [];
     });
+    if (!wasCorrectIdentifierFound_vitestWorkspaceConfigWithAliasedTs) throw new Error(`Couldn't find a "${CORRECT_IDENTIFIERS.vitestWorkspaceConfigWithAliasedTs}()" call in the source file.`);
     return versions;
 }
 
-function create_vitestConfigWithAliasedTs(
+function create_vitestWorkspaceConfigWithAliasedTs(
     version: string,
     toUpdate?: WalkResult_VersionAndNode["cloneNodeOfArrayElement"],
 ): WalkResult_VersionAndNode {
@@ -222,7 +226,7 @@ function create_vitestConfigWithAliasedTs(
     const cloneNodeOfArrayElement = (() => {
         if (toUpdate === void 0) {
             return factory.createCallExpression(
-                factory.createIdentifier(CORRECT_IDENTIFIERS.vitestConfigWithAliasedTs),
+                factory.createIdentifier(CORRECT_IDENTIFIERS.vitestWorkspaceConfigWithAliasedTs),
                 void 0,
                 [
                     factory.createStringLiteral(version),
