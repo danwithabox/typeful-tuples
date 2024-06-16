@@ -1,46 +1,185 @@
-import { test } from "vitest";
-import { tuple, tupleOf, tupleUnique } from "../src/index";
+import { describe, expectTypeOf, test } from "vitest";
+import { tuple, tupleExhaustiveOf, tupleOf, tupleUnique, tupleUniqueOf } from "../src/index";
 
-test("usability demo for tuple()", () => {
-    const values1_correct = tuple([1, 2, 3, 4]);
-    const values2_correct = tuple([1, "a", true, ["a", "b"], { a: [false, false], }]);
-});
+describe(`smoke tests`, () => {
+    test("for tuple()", () => {
+        const value = tuple([1, "a", true, ["a", "b"], { a: [false, false], }]);
+        expectTypeOf(value).toEqualTypeOf<[1, "a", true, readonly ["a", "b"], { readonly a: readonly [false, false], }]>();
+    });
 
-test("usability demo for tupleOf()", () => {
-    const values1_correct = tupleOf<number>()([1, 2, 3, 4]);
-    const values2_correct = tupleOf<number | string | boolean>()([1, "a", "b", true, false, 2]);
-    const values3_correct = tupleOf()([1, ["a", "b"], ["a", "x"], true, false, 2]);
-    const values4_correct = tupleOf()([1, ["a", "b"], ["a", "x"], true, false, 2] as const);
-    const values5_correct = tupleOf()([1, ["a", "b"], ["a", "x"], { a: [false, false], }, { a: [false, true], }, true, false, 2]);
-});
+    test("for tupleOf()", () => {
+        {
+            const value = tupleOf<number | string | boolean>()([1, "a", "b", true, false, 2]);
+            expectTypeOf(value).toEqualTypeOf<[number, string, string, true, false, number]>();
+        }
+        {
+            const value = tupleOf<number | string | boolean>()([1, "a", "b", true, false, 2] as const);
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleOf<number | string | boolean>()(tuple([1, "a", "b", true, false, 2]));
+            expectTypeOf(value).toEqualTypeOf<[1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleOf<number | string | boolean>()(tuple([1, "a", "b", true, false, 2] as const));
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2]);
+            expectTypeOf(value).toEqualTypeOf<[1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2] as const);
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+    });
 
-test("usability demo for tupleUnique()", () => {
-    const values1_correct1 = tupleUnique([1, 2, 3, 4]);
-    // @ts-expect-error invalid
-    const values1_invalid1 = tupleUnique([1, 2, 3, 2]);
+    test("for tupleUnique()", () => {
+        {
+            const value = tupleUnique([1, ["a", "b"], ["a", "x"], { a: [false, true], }, { b: [false, true], }, true, false, 2]);
+            expectTypeOf(value).toEqualTypeOf<[1, readonly ["a", "b"], readonly ["a", "x"], { readonly a: readonly [false, true], }, { readonly b: readonly [false, true], }, true, false, 2]>();
+        }
+        {
+            // @ts-expect-error invalid
+            const value = tupleUnique([1, ["a", "b"], ["a", "b"], { a: [false, true], },  { a: [false, true], }, true, true,  1]);
+        }
+    });
 
-    const values2_correct1 = tupleUnique([1, 2, 3, 4, 5]);
-    // @ts-expect-error invalid
-    const values2_invalid1 = tupleUnique([1, 2, 3, 1, 2]);
+    test("for tupleUniqueOf()", () => {
+        {
+            const value = tupleUniqueOf<number | string | boolean>()([
+                1, "a",
+                // @ts-expect-error invalid
+                "b",
+                true, false,
+                // @ts-expect-error invalid
+                2,
+            ]);
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()([1, "a", "b", true, false, 2] as const);
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ] as const);
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()(tuple([1, "a", "b", true, false, 2]));
+            expectTypeOf(value).toEqualTypeOf<[1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "a", true, false, 2]),
+            );
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()(tuple([1, "a", "b", true, false, 2] as const));
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleUniqueOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "a", true, false, 2] as const),
+            );
+        }
+        {
+            const value = tupleUniqueOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2]);
+            expectTypeOf(value).toEqualTypeOf<[1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleUniqueOf<boolean | 1 | 2 | "a" | "b">()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ]);
+        }
+        {
+            const value = tupleUniqueOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2] as const);
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleUniqueOf<boolean | 1 | 2 | "a" | "b">()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ] as const);
+        }
+    });
 
-    const values3_correct1 = tupleUnique([1, "a", "b", true, false, 2]);
-    // @ts-expect-error invalid
-    const values3_invalid1 = tupleUnique([1, "a", "a", true, true,  1]);
-
-    const values4_correct1 = tupleUnique([1, ["a", "b"], ["a", "x"], true, false, 2]);
-    // @ts-expect-error invalid
-    const values4_invalid1 = tupleUnique([1, ["a", "b"], ["a", "b"], true, true,  1]);
-
-    const values5_correct1 = tupleUnique([1, ["a", "b"], ["a", "x"], { a: [false, false], }, { a: [false, true], }, true, false, 2]);
-    const values5_correct2 = tupleUnique([1, ["a", "b"], ["a", "x"], { a: [false, true], },  { b: [false, true], }, true, false, 2]);
-    // @ts-expect-error invalid
-    const values5_invalid1 = tupleUnique([1, ["a", "b"], ["a", "b"], { a: [false, true], },  { a: [false, true], }, true, true,  1]);
-});
-
-test("usability demo for tupleUniqueOf()", () => {
-// TODO
-});
-
-test("usability demo for tupleExhaustiveOf()", () => {
-// TODO
+    test("for tupleExhaustiveOf()", () => {
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()([
+                1, "a",
+                // @ts-expect-error invalid
+                "b",
+                true, false,
+                // @ts-expect-error invalid
+                2,
+            ]);
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                [1, "a", "b", true, false, 2] as const,
+            );
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ] as const);
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "b", true, false, 2]),
+            );
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "a", true, false, 2]),
+            );
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "b", true, false, 2] as const),
+            );
+        }
+        {
+            const value = tupleExhaustiveOf<number | string | boolean>()(
+                // @ts-expect-error invalid
+                tuple([1, "a", "a", true, false, 2] as const),
+            );
+        }
+        {
+            const value = tupleExhaustiveOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2]);
+            expectTypeOf(value).toEqualTypeOf<[1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleExhaustiveOf<boolean | 1 | 2 | "a" | "b">()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ]);
+        }
+        {
+            const value = tupleExhaustiveOf<boolean | 1 | 2 | "a" | "b">()([1, "a", "b", true, false, 2] as const);
+            expectTypeOf(value).toEqualTypeOf<readonly [1, "a", "b", true, false, 2]>();
+        }
+        {
+            const value = tupleExhaustiveOf<boolean | 1 | 2 | "a" | "b">()([1, "a",
+                // @ts-expect-error invalid
+                "a",
+                true, false, 2,
+            ] as const);
+        }
+    });
 });
