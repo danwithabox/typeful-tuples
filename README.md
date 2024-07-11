@@ -1,65 +1,110 @@
-README:
-- list all utils
-- show with gifs the DX of using each util
-- a word about reliability - covered by tests for various TS versions, no heavy type-system abuse
+# Typeful Tuples
 
-TODO:
-- usability test
-    - when having to use as a param, don't try to incorporate the signature, instead expect a dumb array param, and provide the array with this utility at the callsite
+<!-- [![npm version](https://badge.fury.io/js/%40sinclair%2Ftypebox.svg)](https://badge.fury.io/js/%40sinclair%2Ftypebox)
+[![Build](https://github.com/sinclairzx81/typebox/actions/workflows/build.yml/badge.svg)](https://github.com/sinclairzx81/typebox/actions/workflows/build.yml) -->
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TODO:
-- JSDocs
-- real life example
-- disclaimer that this is for TS only, just a type-level thing, so it's lightweight
-- credit inspiration
-    - https://ja.nsommer.dk/articles/type-checked-unique-arrays.html
-    - https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html#const-type-parameters
-- mention that tupleOf could probably be deprecated with partial generics
-    - and make an open issue about it
-    - and reference the upstream TS issue: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
-- type-only examples and tests
-    - rename exported types
-    - document which types can be used and if they can be used, how
-- tested TS versions as peer dependency? check how type-fest and typebox does it
-    - maybe don't, because it has no runtime effect? so failing an install on this would be unnecessary?
-    - list which versions of TS it works with, maybe run tests for other versions somehow?
+TypeScript tuples are good, but they can be better 👉👉
 
-TODO: seed on all found search results
-- https://www.reddit.com/r/typescript/comments/182fkh1/how_do_i_ensure_array_members_are_unique/
+Made possible by [improvements in TypeScript 5.4](https://devblogs.microsoft.com/typescript/announcing-typescript-5-4/), versions below 5.4.2 are not supported!
 
-TODO: testing multiple versions
-- ts-vitest-versioner
-    - FLAG
-        - shortcuts to updates?
-    - MENU
-        - list
-            - latest (5.4.5)
-            - rc (5.5.0-rc)
-            - beta (5.5.0-beta)
-            - next (5.5.0-dev.20240101)
-            - 5.4.0
-        - vitest
-            - > update vitest (1.5.2 -> 1.5.3)
-            - > ~~update vitest (already latest)~~
-        - update
-            - [ ] update pinned - latest (5.4.5 -> 5.4.6)
-            - [ ] ~~update pinned - latest (5.4.5 - already latest)~~
-            - [ ] update pinned - rc (5.5.0-rc -> 5.6.0-rc)
-            - [ ] ~~update pinned - rc (5.5.0-rc - already latest)~~
-            - [ ] update pinned - beta (5.5.0-beta -> 5.6.0-beta)
-            - [ ] ~~update pinned - beta (5.5.0-beta - already latest)~~
-            - [ ] update pinned - next (5.5.0-dev.20240101 -> 5.6.0-20240102)
-        - generate
-            - > Custom input
-                - Slow-validate input
-            - > ~~5.4.0~~
-        - delete
-            - > ~~latest (5.4.5)~~
-            - > ~~beta (5.5.0-beta)~~
-            - > 5.4.0
+## Install
 
-TODO:
-- npx npm-packlist
-    - is .editorconfig and LICENSE supposed to be packed?
-        - are they even packed?
-            - what's the command for packing without publish to inspect it?
+```bash
+$ npm install @danwithabox/typeful-tuples --save
+```
+
+## Overview
+
+Ever been annoyed by `as const` returning readonly arrays? It's a thing of the past!
+```ts
+const nay = ["foo", "bar"] as const;
+const yay = tuple(["foo", "bar"]); // not readonly!
+```
+Great, but what if you'd like to narrow the allowed elements?
+```ts
+const yay = tupleOf<"foo" | "baz">()(["foo", "bar"]); // and realize that you meant `"baz"` instead of `"bar"`!
+```
+Or did you want to express well-known values, without the risk of duplicates?
+```ts
+const colorOptions = tupleUnique(["gray", "red", "blue", "light green", "gold", "red", "lime green"]); // a red squiggle will mark the embarrassing doubled option!
+```
+And again, narrowing the allowed elements:
+```ts
+const colorOptionsButBoring = tupleUniqueOf<"red" | "blue">()(["gray", "red", "blue", "light green", "gold", "red", "lime green"]); // lots more red squiggles now, enforcing a really boring color picker!
+```
+But what if you not only want to narrow, but enforce the provided elements?
+```ts
+const colorOptionsForSure = tupleExhaustiveOf<"red" | "green" | "blue">()(["red", "blue"]); // missing something!
+```
+
+In summary:
+
+|                               | uniqueness?   | narrowed?     | exhaustive?   |
+| ----------------------------- | ------------- | ------------- | ------------- |
+| `tuple()`                     | ❌           | ❌            | ❌           |
+| `tupleUnique()`               | ✅           | ❌            | ❌           |
+| `tupleOf<T>()()`              | ❌           | ✅            | ❌           |
+| `tupleUniqueOf<T>()()`        | ✅           | ✅            | ❌           |
+| `tupleExhaustiveOf<T>()()`    | ✅           | ✅            | ✅           |
+
+## Example
+
+![output](https://github.com/danwithabox/typeful-tuples/assets/144792741/2e46bee7-e8f0-4d91-b80c-204a895e2261)
+
+```ts
+import { tuple, tupleOf, tupleUnique, tupleUniqueOf, tupleExhaustiveOf } from "@danwithabox/typeful-tuples";
+
+type Allowed = "foo" | "bar" | 42 | "baz";
+
+// Behaves like `[] as const`, except the result array is not `readonly`
+tuple(["foo", "foo"]);
+
+// Non-unique elements are rejected with a `never` type
+tupleUnique(["foo", "bar", "baz"]);
+
+// Same as `tuple()`, but only accepts the provided types
+tupleOf<Allowed>()(["bar", "foo", "foo", "bar"]);
+
+// Same as `tupleUnique()`, but only accepts the provided types
+tupleUniqueOf<Allowed>()(["foo", "bar"]);
+
+// Same as `tupleUniqueOf()`, but all provided types are required in the tuple
+tupleExhaustiveOf<Allowed>()(["baz", 42, "bar", "foo"]);
+
+```
+
+## Assurances
+
+### Performance
+Typechecking speed is excellent and scales linearly - but way before that could become a problem, TS may throw `Type instantiation is excessively deep and possibly infinite.ts(2589)`. This [tends to happen with advanced types](https://github.com/sindresorhus/type-fest/pull/650), unfortunately. From what I've seen, unique tuples should not throw below ~40 elements. Meaningful hand-written tuples are rarely that large, but I'm not entriely happy with it anyway, and may improve it in the future.
+
+### Reliability
+While the type algebra I use for this package is non-trivial, it's also non-volatile - the TypeScript features exploited in here *are supposed to be stable*.
+
+**However**, TypeScript is very lax with breaking changes: [TypeScript’s Versioning Policy - Semantic Versioning for TypeScript Types (semver-ts.org)](https://www.semver-ts.org/1-background.html)
+
+As such, I have created robusts tests and embedded a CLI tool in this project:
+- the tests cover multiple TypeScript versions, and also assert error messages / red squiggles
+- consumers of the package see nothing of this
+- people who wish to mess with the source should check the `"bin"` property in `package.json`
+
+> **TLDR**: not even wild TypeScript updates may break this package
+
+## Limitations
+Not a lot!
+
+One limitation is the `Type instantiation is excessively deep and possibly infinite.ts(2589)` issue mentioned above.
+
+`NaN`, `Symbol`s and other such special values that look distinct, but are actually not unique literals according to the type system, also cause issues. Do not use them as elements for now.
+
+If you are wondering why `tupleOf<T>()()`, `tupleUniqueOf<T>()()`, and `tupleExhaustiveOf<>()()` are curried functions, it's because of the need for a user-defined generic type parameter. The upstream TypeScript issue that blocks them from becoming non-curried, or even merged with `tuple()` and `tupleUnique()`, is this: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
+<!-- Incorporating typeful tuples into function signatures as parameters, e.g. telling a function to expect a unique tuple, cannot be simplified much. -->
+
+
+## Feedback & Contribution
+I welcome feedback about use cases where this package may fall short, but within the scope of "tuple element uniqueness checks".
+
+My motivation to create this was slowly built up over years of slight frustrations with tuples, if you have similar pet peeves, do tell.
+
+As with any advanced TypeScript stuff, the types powering this are not for the faint of heart, and I do not wish to complicate them much further - post issues with this in mind.
