@@ -40,7 +40,7 @@
     },
     "devDependencies": {
         "@commander-js/extra-typings": "^12.0.1",
-        "@danwithabox/eslint-entree": "^0.3.0",
+        "@danwithabox/eslint-entree": "^0.3.4",
         "@inquirer/prompts": "^5.0.2",
         "@types/fs-extra": "^11.0.4",
         "@types/node": "^20.11.19",
@@ -60,10 +60,13 @@
         "tsup": "^8.0.2",
         "tsx": "^4.7.3",
         "type-fest": "^4.18.1",
-        "typescript": "5.4.5",
-        "vitest": "1.6.0",
-        "typescript-5.5.2": "npm:typescript@5.5.2",
+        "typescript": ">=5.4.2",
+        "typescript-5.4.2": "npm:typescript@5.4.2",
         "typescript-5.4.5": "npm:typescript@5.4.5",
-        "typescript-5.4.2": "npm:typescript@5.4.2"
+        "typescript-5.5.2": "npm:typescript@5.5.2",
+        "vitest": "1.6.0"
+    },
+    "peerDependencies": {
+        "typescript": "^5.5.3"
     }
 }

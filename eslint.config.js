@@ -1,15 +1,9 @@
 // @ts-check
-import { defineFlatConfig, rules_config_typescript, flatConfigFilterRules, flatConfigDefineRules, entreeConfigTypeScript } from "@danwithabox/eslint-entree";
-
-const typescript = flatConfigFilterRules(
-    flatConfigDefineRules({
-        ...rules_config_typescript(),
-    }),
-    {
-        exclude: [],
-    },
-);
+import { defineFlatConfig, entreeRules, entreeConfigs } from "@danwithabox/eslint-entree";
 
 export default defineFlatConfig([
-    ...entreeConfigTypeScript({ typescript, }),
+    ...entreeConfigs.typeScript({
+        typeScriptRules: entreeRules.typeScript(),
+        gitignore:       true,
+    }),
 ]);

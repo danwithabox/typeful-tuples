@@ -1,18 +1,17 @@
 # Typeful Tuples
 
-<!-- [![npm version](https://badge.fury.io/js/%40sinclair%2Ftypebox.svg)](https://badge.fury.io/js/%40sinclair%2Ftypebox)
-[![Build](https://github.com/sinclairzx81/typebox/actions/workflows/build.yml/badge.svg)](https://github.com/sinclairzx81/typebox/actions/workflows/build.yml) -->
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 TypeScript tuples are good, but they can be better 👉👉
-
-Made possible by [improvements in TypeScript 5.4](https://devblogs.microsoft.com/typescript/announcing-typescript-5-4/), versions below 5.4.2 are not supported!
 
 ## Install
 
 ```bash
 $ npm install @danwithabox/typeful-tuples --save
 ```
+
+> [!IMPORTANT]
+> This package has a peer dependency of `typescript@>=5.4.2`, versions below are not supported as this depends on [inference improvements from TypeScript 5.4](https://devblogs.microsoft.com/typescript/announcing-typescript-5-4/)!
 
 ## Overview
 
@@ -85,7 +84,7 @@ While the type algebra I use for this package is non-trivial, it's also non-vola
 **However**, TypeScript is very lax with breaking changes: [TypeScript’s Versioning Policy - Semantic Versioning for TypeScript Types (semver-ts.org)](https://www.semver-ts.org/1-background.html)
 
 As such, I have created robusts tests and embedded a CLI tool in this project:
-- the tests cover multiple TypeScript versions, and also assert error messages / red squiggles
+- the tests cover multiple TypeScript versions, and also assert IDE and language server messages (autocompletes and "red squiggles")
 - consumers of the package see nothing of this
 - people who wish to mess with the source should check the `"bin"` property in `package.json`
 
@@ -98,9 +97,13 @@ One limitation is the `Type instantiation is excessively deep and possibly infin
 
 `NaN`, `Symbol`s and other such special values that look distinct, but are actually not unique literals according to the type system, also cause issues. Do not use them as elements for now.
 
-If you are wondering why `tupleOf<T>()()`, `tupleUniqueOf<T>()()`, and `tupleExhaustiveOf<>()()` are curried functions, it's because of the need for a user-defined generic type parameter. The upstream TypeScript issue that blocks them from becoming non-curried, or even merged with `tuple()` and `tupleUnique()`, is this: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
+If you are wondering why `tupleOf<T>()()`, `tupleUniqueOf<T>()()`, and `tupleExhaustiveOf<>()()` are curried functions, it's because of the need for a user-defined generic type parameter. The upstream TypeScript issue that blocks them from becoming non-curried, or to even be merged with `tuple()` and `tupleUnique()`, is this: [Proposal: Partial Type Argument Inference #26242](https://github.com/microsoft/TypeScript/issues/26242)
 <!-- Incorporating typeful tuples into function signatures as parameters, e.g. telling a function to expect a unique tuple, cannot be simplified much. -->
 
+## Acknowledgements
+Initial inspiration by: https://ja.nsommer.dk/articles/type-checked-unique-arrays.html
+
+Grateful for this TypeScript feature finally landing: https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html#const-type-parameters
 
 ## Feedback & Contribution
 I welcome feedback about use cases where this package may fall short, but within the scope of "tuple element uniqueness checks".

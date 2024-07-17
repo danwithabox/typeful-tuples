@@ -5,7 +5,8 @@
         },
     ],
     "settings": {
-        "typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib"
+        "typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib",
+        "editor.lightbulb.enabled": "off"
     },
     "launch": {
         "version": "0.2.0",
