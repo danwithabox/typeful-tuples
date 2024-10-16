@@ -366,7 +366,7 @@ await async function main() {
                     }
                     console.info();
                     const isApplyRequested = await inquirer.confirm({
-                        message: "Apply queued changes to temporary files?",
+                        message: `Apply queued changes to temporary files in "${PATH_DIR_TEMP}" ?`,
                         default: false,
                     });
                     if (isApplyRequested) menuState.previewAccepted = true;

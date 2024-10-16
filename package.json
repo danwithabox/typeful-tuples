@@ -1,4 +1,5 @@
 {
+    "private": true,
     "name": "@danwithabox/typeful-tuples",
     "version": "0.1.2",
     "description": "typeful-tuples",
@@ -9,6 +10,15 @@
     "keywords": [
         "typeful-tuples"
     ],
+    "author": "danwithabox <danwithabox@gmail.com> (https://github.com/danwithabox)",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/danwithabox/typeful-tuples.git"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
     "main": "./lib/index.cjs",
     "module": "./lib/index.js",
     "types": "./lib/index.d.ts",
@@ -27,20 +37,22 @@
     "files": [
         "lib"
     ],
-    "author": "danwithabox <danwithabox@gmail.com> (https://github.com/danwithabox)",
-    "license": "MIT",
     "scripts": {
+        "prepare": "husky || true",
         "build": "tsup && publint",
-        "prepack": "npm run build",
-        "prepublishOnly": "npm run build",
-        "test": "vitest run"
+        "test": "vitest run",
+        "type-check": "tsc --noEmit",
+        "changeset:help": "echo You probably want to run `npx changeset`. Check out `.changeset/README.md` for more."
     },
     "bin": {
         "gen-vitest": "bin/gen-vitest/gen-vitest.ts"
     },
     "devDependencies": {
+        "@changesets/cli": "^2.27.9",
         "@commander-js/extra-typings": "^12.0.1",
-        "@danwithabox/eslint-entree": "^0.3.4",
+        "@commitlint/cli": "^19.5.0",
+        "@commitlint/config-conventional": "^19.5.0",
+        "@danwithabox/eslint-entree": "^0.4.1",
         "@inquirer/prompts": "^5.0.2",
         "@types/fs-extra": "^11.0.4",
         "@types/node": "^20.11.19",
@@ -54,6 +66,7 @@
         "execa": "^8.0.1",
         "fs-extra": "^11.2.0",
         "glob": "^10.3.12",
+        "husky": "^9.1.6",
         "ora": "^8.0.1",
         "pathe": "^1.1.2",
         "publint": "^0.2.7",
@@ -64,6 +77,7 @@
         "typescript-5.4.2": "npm:typescript@5.4.2",
         "typescript-5.4.5": "npm:typescript@5.4.5",
         "typescript-5.5.2": "npm:typescript@5.5.2",
+        "typescript-5.6.2": "npm:typescript@5.6.2",
         "vitest": "1.6.0"
     },
     "peerDependencies": {

@@ -10,10 +10,11 @@ import { vitestWorkspaceConfigWithAliasedTs } from "./vitest/utils/vitest-worksp
  *      - identifier has to be "vitestWorkspaceConfigWithAliasedTs", no rename is allowed
  *  - first parameter of "vitestWorkspaceConfigWithAliasedTs" has to be a raw string literal
  *      - not computed
- *      - no non-raw template strings are allowed
+ *      - no non-raw template strings are allowed, raw template strings (e.g. simply swapping quotes (' or ") to backticks (`) is fine)
  */
 
 export default defineWorkspace([
+    vitestWorkspaceConfigWithAliasedTs("5.6.2"),
     vitestWorkspaceConfigWithAliasedTs("5.5.2"),
     vitestWorkspaceConfigWithAliasedTs("5.4.5", {
         test: {},
