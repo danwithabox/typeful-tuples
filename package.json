@@ -1,6 +1,6 @@
 {
     "name": "@danwithabox/typeful-tuples",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "typeful-tuples",
     "type": "module",
     "engines": {
