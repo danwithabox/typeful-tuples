@@ -6,25 +6,26 @@ import fs from "fs-extra";
 import { glob } from "glob";
 import { program } from "@commander-js/extra-typings";
 import { execa } from "execa";
-import ora, { type Ora } from "ora";
+import ora from "ora";
 import editorconfig from "editorconfig";
-import type { Promisable, OverrideProperties } from "type-fest";
+import type { OverrideProperties } from "type-fest";
 import * as inquirer from "@inquirer/prompts";
 import { useVitestWorkspaceAliasHandler, type TransformRecipe_AliasedTsVersions } from "./vitest-alias-update";
 import chalk from "chalk";
 import { PREFIX_TS_ALIAS } from "../../vitest/utils/vitest-workspaces-shared";
+import { useAsyncOperation } from "./utils/use-async-operation";
 
 const __join = (...str: string[]) => join(import.meta.url, ...str);
 
-const PATH_DIR_TEMP = `./gen-vitest-temp/` as const;
+const PATH_DIR_TEMP = `./vitest-ts-workspace-gen-temp/` as const;
 const PATH_DIR_ROOT = `../../` as const;
 const PATH_FILE_PACKAGE_JSON = `package.json` as const;
 const PATH_FILE_VITEST_WORKSPACE_TS = `vitest.workspace.ts` as const;
 
 await async function main() {
     const params = program
-        .name("npx gen-vitest")
-        .description(`Manages vitest.workspace.ts to run Vitest with multiple specified pinned versions of typescript.`)
+        .name("npx vitest-ts-workspace-gen")
+        .description(`Manages vitest.workspace.ts to run Vitest with multiple specified pinned versions of TypeScript.`)
         .showHelpAfterError()
         .option(`--keep-temp`, `Keeps the "${PATH_DIR_TEMP}" folder (on error AND success). Default: false.`)
         .option(`--no-internet`, `Disables dependence on access to npm servers. Note that this also makes adding versions unsafe. Default: false.`)
@@ -72,7 +73,7 @@ await async function main() {
         const usingNpmViewTypescriptVersions = useNpmViewTypescriptVersions({ noInternet: !internet, });
         const usingVitestWorkspaceAliasHandler = useVitestWorkspaceAliasHandler({
             projectRootPath,
-            vitestWorkspacefilePath: join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
+            vitestWorkspaceFilePath: join(import.meta.url, PATH_DIR_TEMP, `./${PATH_FILE_VITEST_WORKSPACE_TS}`),
         });
         const usingRecipeCache = useRecipeCache();
         const usingParsedVersions = useParsedVersions(usingVitestWorkspaceAliasHandler.astOperation_parseVersions());
@@ -162,7 +163,7 @@ await async function main() {
             }
             function makeMenuOption_remove() {
                 type _Choices = OverrideProperties<
-                    Exclude<Parameters<(typeof inquirer.checkbox<string>)>[0]["choices"][number], inquirer.Separator>,
+                    Exclude<Parameters<(typeof inquirer.checkbox<string>)>[0]["choices"][number], inquirer.Separator | string>,
                     { disabled: { isVersionInRecipeCache_remove: boolean, isVersionInRecipeCache_update: boolean, }, }
                 >;
                 const choices: _Choices[] = usingParsedVersions.getVersions().map(tsVersion => {
@@ -211,7 +212,7 @@ await async function main() {
             }
             function makeMenuOption_update() {
                 type _Choices = OverrideProperties<
-                    Exclude<Parameters<(typeof inquirer.select<string>)>[0]["choices"][number], inquirer.Separator>,
+                    Exclude<Parameters<(typeof inquirer.select<string>)>[0]["choices"][number], inquirer.Separator | string>,
                     { disabled: { isVersionInRecipeCache_update: boolean, isVersionInRecipeCache_remove: boolean, }, }
                 >;
                 const choices: _Choices[] = usingParsedVersions.getVersions().map(tsVersion => {
@@ -340,7 +341,7 @@ await async function main() {
                 }
                 case "edit changes": {
                     const inquirer_checkbox = inquirer.checkbox<RecipeListFormatElement>;
-                    type _Choices = Parameters<(typeof inquirer_checkbox)>[0]["choices"][number];
+                    type _Choices = Exclude<Parameters<(typeof inquirer_checkbox)>[0]["choices"][number], inquirer.Separator | string>;
 
                     const selection = await inquirer_checkbox({
                         message: "Select which changes to remove from the queue:",
@@ -454,9 +455,7 @@ await async function main() {
                 await asyncOperation(`Running npm install to install files`, async ({ succeed, fail, pause, resume, }) => {
                     try {
                         pause();
-                        const proc = execa(`npm install`);
-                        proc.pipeStdout?.(process.stdout);
-                        proc.pipeStderr?.(process.stderr);
+                        const proc = execa(`npm install`, { stdout: ["pipe", process.stdout], stderr: ["pipe", process.stderr], });
                         await proc;
                         resume();
                     } catch (error) {
@@ -636,7 +635,7 @@ function useRecipeCache() {
 
 /** Safe deletions without using the equivalent of `rm -rf`. Will error due to non-empty directory, if an unknown file is present in the temp dir. */
 async function safeRmdir() {
-    /** Glob relative to `__dirname` (`"/bin/gen-vitest/gen-vitest-temp"`) */
+    /** Glob relative to `__dirname` (`"/bin/vitest-ts-workspace-gen/vitest-ts-workspace-gen-temp"`) */
     const globAtTempDirToAbsolute = async (pattern: string | string[]) => (await glob(pattern, { cwd: __join(PATH_DIR_TEMP), }))
         .map((globPath) => __join(PATH_DIR_TEMP, globPath))
     ;
@@ -653,41 +652,4 @@ async function safeRmdir() {
     } catch (error) {
         throw error;
     }
-}
-
-function useAsyncOperation(ora: Ora) {
-    async function asyncOperation<R>(
-        text: string,
-        operationFn: (messageFns: {
-            succeed: (message?: string) => void,
-            fail:    (message: string | ((text: string) => string)) => void,
-            pause:   () => void,
-            resume:  () => void,
-        }) => Promisable<R>,
-    ) {
-        ora.start(text);
-        const result = await operationFn({
-            succeed(message) {
-                const _message: string = message ?? text;
-                ora.succeed(_message);
-            },
-            fail(message) {
-                const _message: string = typeof message === "function" ? message(text) : message;
-                ora.fail(_message);
-                throw new Error(_message);
-            },
-            pause() {
-                ora.stopAndPersist();
-            },
-            resume() {
-                ora.start(text);
-            },
-        });
-        ora.stop();
-        return result;
-    }
-
-    return {
-        asyncOperation,
-    };
 }

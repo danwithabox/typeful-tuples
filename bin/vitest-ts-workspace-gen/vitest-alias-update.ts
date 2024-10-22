@@ -9,9 +9,9 @@ const CORRECT_IDENTIFIERS = {
     "vitestWorkspaceConfigWithAliasedTs": "vitestWorkspaceConfigWithAliasedTs",
 } as const;
 
-export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspacefilePath, }: {
+export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspaceFilePath, }: {
     projectRootPath:         string,
-    vitestWorkspacefilePath: string,
+    vitestWorkspaceFilePath: string,
 }) {
     /**
      * TODO:
@@ -52,7 +52,7 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
         };
     }
 
-    const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(vitestWorkspacefilePath);
+    const { sourceFile, decodeEmptyLines, } = makeAdaptedSourceFile(vitestWorkspaceFilePath);
 
     const nodeOf_ExportAssignment = walkMaybeToNodeOf(node => {
         if (ts.isExportAssignment(node)) return node;
@@ -119,7 +119,7 @@ export function useVitestWorkspaceAliasHandler({ projectRootPath, vitestWorkspac
         const [{ output: linted, }] = await eslint.lintText(source_decoded);
 
         if (linted === void 0) throw new Error(`ESLint output missing, somehow`);
-        tsTool.host.writeFile(vitestWorkspacefilePath, linted, false);
+        tsTool.host.writeFile(vitestWorkspaceFilePath, linted, false);
     }
 
     return {

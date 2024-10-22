@@ -12,7 +12,7 @@ expect.extend({
 
         if (!is_TsVfs_ToolingResult_getCompletionsAtPosition(received)) return {
             pass:    false,
-            message: () => `${utils.stringify(received, void 0, { min: true, theme: {  }, })} is${isNot ? "" : " not"} a result of "getCompletionsAtPosition()"\n`,
+            message: () => `${utils.stringify(received, void 0, { min: true, })} is${isNot ? "" : " not"} a result of "getCompletionsAtPosition()"\n`,
         };
 
         const result = ((): { pass: true, } | { pass: false, errorMessage: string, } => {
@@ -51,7 +51,7 @@ expect.extend({
 
         if (!is_TsVfs_ToolingResult_getSemanticDiagnostics(received)) return {
             pass:    false,
-            message: () => `${utils.stringify(received, void 0, { min: true, theme: {  }, })} is${isNot ? "" : " not"} a result of "getSemanticDiagnostics()"\n`,
+            message: () => `${utils.stringify(received, void 0, { min: true, })} is${isNot ? "" : " not"} a result of "getSemanticDiagnostics()"\n`,
         };
 
         // TODO: this is why (:rework-flatten-processed-diag) might be nicer, also, line numbers are not obvious where they belong, currently, and consider returning substrings too
@@ -126,6 +126,8 @@ interface CustomMatchers<R = unknown> {
 }
 
 declare module "vitest" {
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     interface Assertion<T = any> extends CustomMatchers<T> {}
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     interface AsymmetricMatchersContaining extends CustomMatchers {}
 }

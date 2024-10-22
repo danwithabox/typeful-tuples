@@ -60,7 +60,7 @@ await async function main() {
                                 name: { escapedText: name, },
                                 propertyName: _propertyName,
                             } = importSpecifier;
-                            const propertyName = _propertyName?.escapedText;
+                            const propertyName = _propertyName?.text;
 
                             if (name === "defWspace") {
                                 console.log("check");
