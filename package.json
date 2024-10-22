@@ -1,7 +1,7 @@
 {
     "name": "@danwithabox/typeful-tuples",
+    "description": "TypeScript tuples are good, but they can be better 👉👉",
     "version": "0.3.0",
-    "description": "typeful-tuples",
     "type": "module",
     "engines": {
         "node": "^18.18.0 || >=20.0.0"
@@ -48,7 +48,7 @@
         "prepare": "husky || true",
         "build": "tsup && publint",
         "test": "vitest run",
-        "type-check": "tsc --noEmit",
+        "type-check": "tsc --noEmit && echo type-check ✅",
         "changeset:help": "echo You probably want to run `npx changeset`. Check out `.changeset/README.md` for more."
     },
     "bin": {
