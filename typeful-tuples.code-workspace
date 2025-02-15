@@ -4,9 +4,33 @@
             "path": "."
         },
     ],
+    "extensions": {
+        "recommendations": [
+            "dbaeumer.vscode-eslint",
+            "aaron-bond.better-comments",
+            "bierner.comment-tagged-templates"
+        ],
+        "unwantedRecommendations": [
+            "ms-vscode.vscode-typescript-tslint-plugin",
+        ]
+    },
     "settings": {
         "typescript.tsdk": "typeful-tuples\\node_modules\\typescript\\lib",
-        "editor.lightbulb.enabled": "off"
+        "editor.lightbulb.enabled": "off",
+        "eslint.useFlatConfig": true,
+        "eslint.format.enable": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit",
+            "source.organizeImports": "never",
+        },
+        "[javascript]": {
+            "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+            "editor.formatOnSave": true,
+        },
+        "[typescript]": {
+            "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+            "editor.formatOnSave": true,
+        },
     },
     "launch": {
         "version": "0.2.0",
