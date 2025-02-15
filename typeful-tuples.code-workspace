@@ -31,6 +31,10 @@
             "editor.defaultFormatter": "dbaeumer.vscode-eslint",
             "editor.formatOnSave": true,
         },
+        "cSpell.words": [
+            "desm",
+            "publint"
+        ],
     },
     "launch": {
         "version": "0.2.0",

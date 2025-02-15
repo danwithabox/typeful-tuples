@@ -14,6 +14,7 @@ import { vitestWorkspaceConfigWithAliasedTs } from "./vitest/utils/vitest-worksp
  */
 
 export default defineWorkspace([
+    vitestWorkspaceConfigWithAliasedTs("5.7.3"),
     vitestWorkspaceConfigWithAliasedTs("5.6.2"),
     vitestWorkspaceConfigWithAliasedTs("5.5.2"),
     vitestWorkspaceConfigWithAliasedTs("5.4.2"),
